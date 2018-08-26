@@ -200,21 +200,20 @@ public:
   UT181Interface();
   void service(void);
   void Connect(bool bCon);
-  bool Connected(void);
   bool Updated(void);
   bool WriteData(uint8_t *pData, int len);
   char *TimeText(uniDate dt);
   char *ValueText(int which);
-  char *UnitText(void);
-  int dataType(void);
   int DisplayCnt(void);
-  void Hold(void);
-  void MinMax(void);
   void SetRange(uint8_t n);
   void SetSelect(uint8_t nSel, bool bRel, float fValue);
   bool RelState(void);
   float GetfValue(void);
-  uint8_t GetSelect(void);
+  void Hold(void);
+  void MinMax(void);
+  void RangeMod(int &nMin, int &nMax, int &nMod);
+  void getSign(void);
+  uint16_t StatusBits(void);
 private:
   float bin2float(uint8_t *val);
   void getMValue(MValue *mv, uint8_t *p);
@@ -237,30 +236,32 @@ private:
   void getSaveCount(void);
   void DeleteAllSave(void);
 
-  uint8_t m_buffer[64]; // 3200 required for records
-  uint8_t m_idx;
-  uint8_t m_state;
+  uint8_t  m_buffer[64]; // 3200 required for records
+  uint8_t  m_idx;
+  uint8_t  m_state;
   uint16_t m_len;
-  bool    m_bConnected;
+  int      m_Updated;
 
   uint16_t  m_nSaves;
   uint16_t  m_nRecords;
-  MData     m_MData;
   Comp      m_Comp;
   RecTimer  m_recTime;
-  MinMaxx   m_MM;
   exData    m_exValues;
   SaveRec  *m_pSave;
   Record   *m_pRecords;
   ChartData m_cData;
   uint8_t   m_nRecReq;
-  int   m_nRecIdx;
-  bool  m_bGetRecStart;
-  int   m_nRecordItem;
-  int   m_nRecDataIndexEnd;
-  int   m_nRecDataIndex;
-  int   m_nRecordSampleItem;
-  int   m_Updated;
+  int    m_nRecIdx;
+  bool   m_bGetRecStart;
+  int    m_nRecordItem;
+  int    m_nRecDataIndexEnd;
+  int    m_nRecDataIndex;
+  int    m_nRecordSampleItem;
+  bool   m_bSign;
+public:
+  MData   m_MData;
+  MinMaxx m_MM;
+  bool    m_bConnected;
 };
 
 #endif
