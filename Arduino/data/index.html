@@ -3,7 +3,7 @@
 <head><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>WiFi UT181A Web Page</title>
 <style type="text/css">
-div,table,input{
+input{
 border-radius: 5px;
 margin-bottom: 5px;
 box-shadow: 2px 2px 12px #000000;
@@ -14,7 +14,7 @@ background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);
 background-image: linear-gradient(top, #ffffff, #50a0ff);
 background-clip: padding-box;
 }
-body{width:230px;font-family: Arial, Helvetica, sans-serif;}
+body{width:340px;font-family: Arial, Helvetica, sans-serif;}
 .style5 {
 border-radius: 5px;
 box-shadow: 0px 0px 15px #000000;
@@ -27,9 +27,11 @@ background-image: linear-gradient(top, #ff00ff, #ffa0ff);
 </style>
 <script type="text/javascript">
 a=document.all
-oledon=0
+oledon=0;v=0;min=-60;max=60;mod=5;st=1073676544
 function startWS(){
+draw_bar()
 ws = new WebSocket("ws://"+window.location.host+"/ws")
+//ws = new WebSocket("ws://192.168.0.109/ws")
 ws.onopen = function(evt) { }
 ws.onclose = function(evt) { alert("Connection closed."); }
 ws.onmessage = function(evt) {
@@ -53,6 +55,12 @@ ws.onmessage = function(evt) {
  a.v1.innerHTML=d.v1
  a.v2.innerHTML=d.v2
  a.v3.innerHTML=d.v3
+ v=+d.v
+ min=+d.mn
+ max=+d.mx
+ mod=+d.md
+ st=+d.st
+ draw_bar()
  }
  else if(event == 'alert')
  {
@@ -69,19 +77,84 @@ oledon=!oledon
 setVar('oled', oledon)
 a.OLED.value=oledon?'ON ':'OFF'
 }
+
+function draw_bar(){
+try {
+	var c2 = document.getElementById('canva')
+	ctx = c2.getContext("2d")
+	ctx.fillStyle = "#000";
+	ctx.fillRect(0,0,c2.width,c2.height)
+	ctx.fillStyle = "#FFF";
+	ctx.lineWidth = 1
+	ctx.strokeStyle = "#FFF"
+	ctx.font = "bold 10px sans-serif";
+
+	w=c2.width-30
+  
+	for(i=0;i<=60;i++)
+	{
+		fVal=(i*(max-min)/60)+min
+		x=i/60*w+12
+		if((i%mod)==0)
+		{
+			ctx.fillText(fVal.toFixed(), x-(String(fVal.toFixed()).length/2)*5, 10)
+			ctx.beginPath()
+		    ctx.moveTo(x, 15);
+		    ctx.lineTo(x, 24);
+			ctx.closePath()
+		}
+		else
+		{
+			ctx.beginPath()
+		    ctx.moveTo(x, 18);
+		    ctx.lineTo(x, 24);
+			ctx.closePath()
+		}
+		ctx.stroke()
+	}
+
+	if(min<0)
+	{
+		c=w>>1
+		x=v/max*c
+		ctx.fillStyle = "#FFF";
+		if(x<0)
+		{
+			if(x<-c) x=-c
+			ctx.fillRect(12+c+x, 30, -x, 6);
+		}
+		else
+		{
+			if(x>c) x=c
+			ctx.fillRect(12+c, 30, x, 6);
+		}
+		ctx.fillStyle = "#F00";
+		ctx.fillRect(12+c+x, 30, 1, 6);
+	}
+	else // unsigned
+	{
+		x = v/max*w
+		if(x>w) x=w
+		ctx.fillStyle = "#FFF";
+		ctx.fillRect(12, 30, x, 6);
+		ctx.fillStyle = "#F00";
+		ctx.fillRect(12+x, 30, 1, 6);
+	}
+}catch(err){}
+}
+
 </script>
-<body bgcolor="black" onload="{startWS()}">
+<body bgcolor="black" text="silver"  onload="{startWS()}">
 <div><h3 align="center">WiFi UT181A</h3>
-<table align=center width=200>
-<tr align=center><td><p id="time"> 0:00:00 AM</p></td><td></td></tr>
-<tr align=center><td><p id="value">0L</p></td><td><p id="unit">DCV</p></td></tr>
-<tr><td><p id="v1">0L</p></td><td><p id="u1">DCV</p></td></tr>
-<tr><td><p id="v2">0L</p></td><td><p id="u2">DCV</p></td></tr>
-<tr><td><p id="v3">0L</p></td><td><p id="u3">DCV</p></td></tr>
+<table align=center width=320>
+<tr align=center><td><div id="time"> 0:00:00 AM</div></td><td></td></tr>
+<tr align=center><td><div id="value" style="font-size:xx-large">0L</div></td><td><div id="unit">DCV</div></td></tr>
+<tr><td colspan=2><canvas id="canva" width="300" height="40" style="float:center"></td></tr>
+<tr><td><div id="v1">0L</div></td><td><div id="u1"></div></td></tr>
+<tr><td><div id="v2">0L</div></td><td><div id="u2"></div></td></tr>
+<tr><td><div id="v3">0L</div></td><td><div id="u3"></div></td></tr>
 <tr><td><input id='dc' type=text size=4 value='10'></td>
-<td align=center><input type="button" value="Delayed" id="doorD" onClick="{setVar('door',1)}"></td></tr>
-<tr align=center><td><div id="door"></div></td><td><div id="car">IN</div></td></tr>
-<tr align="center"><td><div id="temp">00.0&degF</div></td><td><div id="rh">00.0%</div></td></tr>
+<td align=center><input type="button" value="Hold" id="hold" onClick="{setVar('hold', 0)}"></td></tr>
 <tr><td>OLED: <input type="button" value="ON" id="OLED" onClick="{oled()}"></td><td><input type="submit" value="Setup" onClick="window.location='/s';"></td></tr>
 </table>
 &nbsp
