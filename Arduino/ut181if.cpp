@@ -52,11 +52,6 @@ void UT181Interface::service()
   }
 }
 
-bool UT181Interface::Connected()
-{
-  return m_bConnected;
-}
-
 bool UT181Interface::Updated()
 {
   bool u = false;
@@ -326,11 +321,6 @@ float UT181Interface::GetfValue()
   return m_MData.Value.fValue;
 }
 
-uint8_t UT181Interface::GetSelect(void)
-{
-  return m_MData.Select;
-}
-
 bool UT181Interface::RelState()
 {
    switch(m_MData.dataType)
@@ -402,7 +392,7 @@ void UT181Interface::getRecord(uint16_t nItem)
 
 void UT181Interface::getRecordCount()
 {
-  uint8_t cmd[]= {0x0E};
+  static uint8_t cmd[]= {0x0E};
 
   Write(cmd, sizeof(cmd) );
 }
@@ -458,7 +448,7 @@ void UT181Interface::getRecordData()
 
 void UT181Interface::Save()
 {
-  uint8_t cmd[]= {0x06};
+  static uint8_t cmd[]= {0x06};
 
   Write(cmd, sizeof(cmd) );
 }
@@ -474,14 +464,14 @@ void UT181Interface::getSave(uint16_t nItem)
 
 void UT181Interface::getSaveCount()
 {
-  uint8_t cmd[]= {0x08};
+  static uint8_t cmd[]= {0x08};
 
   Write(cmd, sizeof(cmd) );
 }
 
 void UT181Interface::DeleteAllSave() // Saves
 {
-  uint8_t cmd[]= {0x09, 0xFF, 0xFF};
+  static uint8_t cmd[]= {0x09, 0xFF, 0xFF};
 
   Write(cmd, sizeof(cmd) );
 }
@@ -492,16 +482,6 @@ char *UT181Interface::TimeText(uniDate dt)
   sprintf(szDate, "%d/%02d/%02d %2d:%02d:%02d",
     dt.year + 2000, dt.month, dt.day, dt.hours, dt.minutes, dt.seconds);
   return szDate;
-}
-
-int UT181Interface::dataType()
-{
-  return m_MData.dataType;
-}
-
-char *UT181Interface::UnitText()
-{
-  return m_MData.szUnit;
 }
 
 int UT181Interface::DisplayCnt()
@@ -534,7 +514,7 @@ char *UT181Interface::ValueText(int which)
 {
   MValue Value;
 
-  if(DisplayCnt() < which)
+  if(DisplayCnt()-1 < which)
     return "";
 
   switch(which)
@@ -584,4 +564,166 @@ char *UT181Interface::ValueText(int which)
   szFmt[2] = Value.Precision + '0';
   sprintf(szVal, szFmt, Value.fValue);
   return szVal;
+}
+
+void UT181Interface::RangeMod(int &nMin, int &nMax, int &nMod)
+{
+  getSign();
+
+  switch(m_MData.dataType) // no bar modes
+  {
+    case 0x42: // Peak
+    case 0x02: // T1
+      nMin = nMax = nMod = 0;
+      return;
+    case 0x06: // T1-T2 // Todo: fix data for mVac+dc
+      if(m_MData.Switch == eSwitch_mVDC)
+      {
+        nMin = nMax = nMod = 0;
+        return;
+      }
+      break;
+  }
+
+  nMin = 0;
+  nMax = 60;
+  nMod = 5;
+
+  static short rangeListMax[10][3][8] =
+  { // 1, 2, 3...
+    {{6,60,600,1000,60},{60},{60}},               // VAC
+    {{60,600,60,60,60},{60},{60}},                // mVAC
+    {{6,60,600,1000,60},{60},{60}},               // VDC
+    {{60,600,60,60,60},{60,600,60,60,60},{60,600,60,60,60}},  // mVDC, C, F
+    {{600,6,60,600,6,60},{600,600,600,600,600},{60,60,60,60,60}}, // Ohms,cont,nS
+    {{30,30,30,30,30},{6,60,600,6,60,600,6,60},{60}}, // Diode, cap
+    {{60,600,6,60,600,6,60},{60,600,6,60,600,6,60},{60,600,6,60,600,6,60}}, //Hz, %, pulse
+    {{600,6000,60,60,60},{600,6000,60,60,60},{60}},       //uADC, uAAC
+    {{60,600,60,60,60},{60,600,60,60,60},{60}},         //mADC, mAAC
+    {{20},{20},{60}},                     //ADC, AAC
+  };
+
+  static bool rangeListMod[10][3][8] =
+  { // 1, 2, 3...
+    {{true ,false,true,true},{false},{false}},  // VAC
+    {{false,true,false,false},{false},{false}}, // mVAC
+    {{false,false,true,true},{false},{false}},  // VDC
+    {{false,true,false},{false,false,false},{false,false,false}}, // mVDC, C, F
+    {{true,true,false,true,true},{true,true,true},{false}}, // Ohms,cont,nS
+    {{true,false,false},{false,false,true,true,false,true,true},{false}}, // Diode, cap
+    {{false,true,true,false,true,true},{false,true,true,false},{false,true,true,false}},  //Hz, %, pulse
+    {{true,true},{true,true},{false}},  //uADC, uAAC
+    {{false},{false},{false}},  //mADC, mAAC
+    {{false},{false},{false}},  //ADC, AAC
+  };
+
+  uint8_t sw = m_MData.Switch - 1;
+  uint8_t sel = m_MData.Select - 1;
+  uint8_t r = m_MData.Range - 1;
+
+  if(sw >= 10) sw = 0;
+  if(sel >= 3) sel = 0;
+  if(r >= 8) r = 0;
+
+  nMax = rangeListMax[sw][sel][r];
+
+  if( m_bSign)
+    nMin = -nMax;
+
+  nMod = rangeListMod[sw][sel][r] ? 10:5;
+  if(nMax == 1000)
+    nMod = 12;
+}
+
+void UT181Interface::getSign()
+{
+  if(m_MData.Value.fValue < 0)
+  {
+    m_bSign = true;
+    return;
+  }
+  static bool rangeListSigned[10][3] =
+  { // 1, 2, 3...
+    {false,false,false},  // VAC
+    {false,false,false},  // mVAC
+    {true ,true ,true },  // VDC
+    {true ,true ,true },  // mVDC, C, F
+    {false,false,false},  // Ohms,cont,nS
+    {false,false,false},  // Diode, cap
+    {false,false,false},  //Hz, %, pulse
+    {true ,false,false},  //uADC, uAAC
+    {true ,false,false},  //mADC, mAAC
+    {true ,false,false},  //ADC, AAC
+  };
+
+  uint8_t sw = m_MData.Switch - 1;
+  uint8_t sel = m_MData.Select - 1;
+
+  if(sw > 10) sw = 0;
+  if(sel > 10) sel = 0;
+
+  m_bSign = rangeListSigned[sw][sel];
+}
+
+uint16_t UT181Interface::StatusBits()
+{
+  uint16_t bits;
+
+  if(m_bSign) // signed state
+    bits |= 1;
+
+    // Switch modes
+  switch(m_MData.Switch)
+  {
+    case eSwitch_Ohms: // Ohms
+      switch(m_MData.Select)
+      {
+        case 2: // cont check beep
+          bits |= (1<<1);
+          break;
+      }
+      break;
+    case eSwitch_Diode:
+      switch(m_MData.Select)
+      {
+        case 1: // Diode
+          bits |= (1<<2);
+          break;
+      }
+      break;
+  }
+
+  if(m_MData.Over) // Over range
+     bits |= (1<<3);
+
+  if(m_MData.Auto) // auto/manual
+     bits |= (1<<4);
+
+  if(m_MData.Hold) // hold
+     bits |= (1<<5);
+
+  if(m_MData.Comp)
+     bits |= (1<<6);
+
+  if(m_Comp.Fail)
+     bits |= (1<<7);
+
+  if(m_MData.Recording)
+     bits |= (1<<8);
+
+  if(m_MData.LeadError)
+     bits |= (1<<9);
+
+  switch(m_MData.dataType)
+  {
+    case 0x10: // rel
+    case 0x16: // rel temp
+    case 0x1E: // dbV
+      bits |= (1<<10); // rel
+      break;
+    case 0x2F: // Max min
+    case 0x27: // max min temp
+      bits |= (1<<11); // MM
+      break;
+  }
 }
