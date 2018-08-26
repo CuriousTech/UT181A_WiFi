@@ -1,0 +1,20 @@
+PCB          OSHPark $7.80 for 3
+ESP-07       eBay
+USB Micro-B  ZX62D-B-5PA8(30) or common eBay
+3V3R         MCP1755T-3302E/OT or MCP1802T-3302I/OT
+CC           MCP73831T-2DCI/OT
+MICROSWITCH  SSSS810701
+BAT (conn)   micro jst 1.25 2 pin
+P1           SFH 310
+D1           IR LED (T-1)
+Q1           SOT23 NPN general purpose
+CHG          0805 LED (red)
+PROG         4mm button (eBay)
+
+R1           0603 10K=100mA, 2K2=454mA (charge rate)
+R2-R4        0805 10K
+R5           0805 47
+R6           0603 470
+
+C1,C2        0603 0.1uF 10V
+C3,C4        0603 4.7uF 10V
