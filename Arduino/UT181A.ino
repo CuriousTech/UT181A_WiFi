@@ -80,14 +80,21 @@ uint16_t displayTimer;
 
 String dataJson()
 {
+  int nMin, nMax, nMod;
+  ut.RangeMod(nMin, nMax, nMod);
+
   String s = "state;{";
   s += "\"t\":";    s += now() - ( (ee.tz + utime.getDST() ) * 3600);
   s += ",\"v\":\""; s += ut.ValueText(0);
-  s += "\",\"u\":\""; s += ut.UnitText();
+  s += "\",\"u\":\""; s += ut.m_MData.szUnit;
   s += "\",\"v1\":\""; s += ut.ValueText(1);
   s += "\",\"v2\":\""; s += ut.ValueText(2);
   s += "\",\"v3\":\""; s += ut.ValueText(3);
-  s += "\",\"c\":"; s += ut.DisplayCnt();
+  s += "\",\"cnt\":"; s += ut.DisplayCnt();
+  s += ",\"mn\":"; s += nMin;
+  s += ",\"mx\":"; s += nMax;
+  s += ",\"md\":"; s += nMod;
+  s += ",\"st\":"; s += ut.StatusBits();
   s += "}\n";
   return s;
 }
@@ -177,7 +184,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           ut.SetSelect(iValue, false, 0);
           break;
         case 6: // rel
-          sel = ut.GetSelect();
+          sel = ut.m_MData.Select;
           if(ut.RelState())
             ut.SetSelect(sel, false, 0);
           else
@@ -387,7 +394,7 @@ void loop()
     if(--connTime == 0)
     {
       connTime = 5;
-      if(ut.Connected() == false)
+      if(ut.m_bConnected == false)
         ut.Connect(true);
     }
 
@@ -412,7 +419,7 @@ void loop()
   {
     display.clear();
     display.drawPropString( 2, 23, ut.ValueText(0) );
-    display.drawPropString(80, 47, ut.UnitText() );
+    display.drawPropString(80, 47, ut.m_MData.szUnit );
     display.display();
   }
 }
