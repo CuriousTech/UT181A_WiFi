@@ -8,4 +8,4 @@ The code is very rough right now, but should be completed in a short time.  Curr
 ![Image](https://www.curioustech.net/images/ut181wifi.jpg)  
 
 Web page  
-![Web](https://www.curioustech.net/images/ut181aweb.png)  
+![Web](https://www.curioustech.net/images/ut181web.png)  
