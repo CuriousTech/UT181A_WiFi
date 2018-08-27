@@ -142,37 +142,7 @@ void UT181Interface::process_sentence(uint16_t len)
       break;
     case 0x02: // main meter data
       m_bConnected = true;
-      memset(&m_exValues, 0, sizeof(m_exValues)); // just easy
-      memset(&m_MM, 0, sizeof(m_MM));
       memcpy(&m_MData, m_buffer + 1, sizeof(MData));
-
-      if(m_MData.Recording)
-      {
-        memcpy(&m_recTime, m_buffer + 19, sizeof(m_recTime));
-      }
-      if(m_MData.Comp)
-      {
-        memcpy(&m_Comp, m_buffer + 19, sizeof(Comp));
-      }
-      else switch(m_MData.dataType)
-      {
-        case 0x08: // normal
-          break;
-        case 0x0A: // peak / dbV
-        case 0x42:
-        case 0x02:
-        case 0x06:
-        case 0x16: // AC+DC, temps
-        case 0x0E: // relative
-        case 0x1E:
-          memcpy(&m_exValues, m_buffer + 19, sizeof(m_exValues));
-          break;
-        case 0x2F:
-        case 0x27: // min/max
-          memcpy(&m_MM, m_buffer + 11, sizeof(m_MM));
-          strcpy(m_MData.szUnit, (char *) m_buffer+38);
-          break;
-      }
       break;
   }
 }
@@ -510,6 +480,14 @@ int UT181Interface::DisplayCnt()
     }
 }
 
+char *UT181Interface::UnitText()
+{
+  if(m_MData.dataType == 0x27 || m_MData.dataType == 0x2F) // MM
+    return m_MData.u.MM.szUnit;
+  else
+    return m_MData.u.Std.szUnit;
+}
+
 char *UT181Interface::ValueText(int which)
 {
   MValue Value;
@@ -517,29 +495,24 @@ char *UT181Interface::ValueText(int which)
   if(DisplayCnt()-1 < which)
     return "";
 
-  switch(which)
-  {
-    default:  Value = m_MData.Value; break;
-    case 1:
-      if(m_MData.dataType == 0x27 || m_MData.dataType == 0x2F) // MM
-        Value = m_MM.Value1;
-      else
-        Value = m_exValues.Value1;
-      break;
-    case 2:
-      if(m_MData.dataType == 0x27 || m_MData.dataType == 0x2F) // MM
-        Value = m_MM.Value2;
-      else
-        Value = m_exValues.Value2;
-      break;
-    case 3:
-      if(m_MData.dataType == 0x27 || m_MData.dataType == 0x2F) // MM
-        Value = m_MM.Value3;
-      else
-        Value = m_exValues.Value3;
-      break;
-  }
-  
+  if(m_MData.dataType == 0x27 || m_MData.dataType == 0x2F) // MM
+    switch(which)
+    {
+      default:  Value = m_MData.Value; break;
+      case 1:   Value = m_MData.u.MM.Value1; break;
+      case 2:   Value = m_MData.u.MM.Value2; break;
+      case 3:   Value = m_MData.u.MM.Value3;
+        break;
+    }
+  else
+    switch(which)
+    {
+      default: Value = m_MData.Value; break;
+      case 1:  Value = m_MData.u.Ext.Value1; break;
+      case 2:  Value = m_MData.u.Ext.Value2; break;
+      case 3:  Value = m_MData.u.Ext.Value3; break;
+    }
+
   static char szVal[16];
 
   if(Value.Blank)
@@ -667,7 +640,7 @@ void UT181Interface::getSign()
 
 uint16_t UT181Interface::StatusBits()
 {
-  uint16_t bits;
+  uint16_t bits = 0;
 
   if(m_bSign) // signed state
     bits |= 1;
@@ -678,7 +651,7 @@ uint16_t UT181Interface::StatusBits()
     case eSwitch_Ohms: // Ohms
       switch(m_MData.Select)
       {
-        case 2: // cont check beep
+        case 2: // cont check
           bits |= (1<<1);
           break;
       }
@@ -705,7 +678,7 @@ uint16_t UT181Interface::StatusBits()
   if(m_MData.Comp)
      bits |= (1<<6);
 
-  if(m_Comp.Fail)
+  if(m_MData.u.Comp.Fail)
      bits |= (1<<7);
 
   if(m_MData.Recording)
@@ -726,4 +699,5 @@ uint16_t UT181Interface::StatusBits()
       bits |= (1<<11); // MM
       break;
   }
+  return bits;
 }
