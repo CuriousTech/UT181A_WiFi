@@ -119,6 +119,59 @@ struct SaveRec
   }u;
 };
 
+union UData
+{
+  struct
+  {
+    char  szUnit[8];
+    uint8_t Unk[4];
+    char  szUnit2[8];
+    char  pad1[26];
+  } Std; // 20
+  struct // Comp mode
+  {
+    char    szUnit[8];
+    uint8_t Unk[4];
+    char    szUnit2[8];
+    uint8_t CompMode:4;
+    uint8_t BeepMode:4;
+    uint8_t Fail;
+    uint8_t Precision;
+    float   fHigh;
+    float   fLow;
+    char pad2[15];
+  } Comp; // 31
+  struct // peak mode, dbV, relative, temp rel
+  {
+    char   szUnit[8];
+    MValue Value1;
+    char   szUnit1[8];
+    MValue Value2;
+    char   szUnit2[8];
+    MValue Value3;
+    char   szUnit3[8];
+  } Ext; //46
+  struct
+  {
+    char     szUnit[8];
+    uint32_t dwElapsed;
+    uint32_t dwRemain;
+    uint32_t dwSamples;
+    char pad3[26];
+  } RecTimer; // 20
+  struct
+  {
+    MValue   Value1;
+    uint32_t dwTime1;
+    MValue   Value2;
+    uint32_t dwTime2;
+    MValue   Value3;
+    uint32_t dwTime3;
+    char     szUnit[8];
+    char pad4[11];
+  } MM; // 35
+};
+
 struct MData
 {
   uint8_t  dataType:7;
@@ -132,56 +185,14 @@ struct MData
   uint8_t  Recording:1;
   uint8_t  Unk2:2;   // byte 1
 
-  uint8_t  option1:4;  // byte 2
+  uint8_t  option1:4;  // byte 2 (T1-T2 reverse bit 1 and 2)
   uint8_t  option2:4;
   uint8_t  Select:4; // byte 3
   uint8_t  Switch:4; // byte 3
   uint8_t  Range:4;  // byte 4
   uint8_t  nUnk:4;   // byte 4
-  MValue  Value;
-  char  szUnit[8];
-  uint8_t  Unk[4];
-  char  szUnit2[8];
-};
-
-struct Comp  // offset 19
-{
-  uint8_t Unk[4];
-  char szUnit[8];
-  uint8_t CompMode:4;
-  uint8_t BeepMode:4;
-  uint8_t Fail;
-  uint8_t Precision;
-  float fHigh;
-  float fLow;
-};
-
-struct MinMaxx
-{
-  MValue Value1;
-  uint32_t dwTime1;
-  MValue Value2;
-  uint32_t dwTime2;
-  MValue Value3;
-  uint32_t dwTime3;
-  char szUnit[8];
-};
-
-struct exData // peak mode, dbV, relative, temp rel
-{
-  MValue Value1;
-  char szUnit1[8];
-  MValue Value2;
-  char szUnit2[8];
-  MValue Value3;
-  char szUnit3[8];
-};
-
-struct RecTimer
-{
-  uint32_t dwElapsed;
-  uint32_t dwRemain;
-  uint32_t dwSamples;
+  MValue   Value;    // 5 bytes
+  UData    u;        // union based on dataType
 };
 
 #pragma pack(pop)
@@ -204,6 +215,7 @@ public:
   bool WriteData(uint8_t *pData, int len);
   char *TimeText(uniDate dt);
   char *ValueText(int which);
+  char *UnitText(void);
   int DisplayCnt(void);
   void SetRange(uint8_t n);
   void SetSelect(uint8_t nSel, bool bRel, float fValue);
@@ -244,9 +256,6 @@ private:
 
   uint16_t  m_nSaves;
   uint16_t  m_nRecords;
-  Comp      m_Comp;
-  RecTimer  m_recTime;
-  exData    m_exValues;
   SaveRec  *m_pSave;
   Record   *m_pRecords;
   ChartData m_cData;
@@ -260,7 +269,6 @@ private:
   bool   m_bSign;
 public:
   MData   m_MData;
-  MinMaxx m_MM;
   bool    m_bConnected;
 };
 
