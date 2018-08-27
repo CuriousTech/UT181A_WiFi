@@ -87,7 +87,7 @@ String dataJson()
   String s = "state;{";
   s += "\"t\":";    s += now() - ( (ee.tz + utime.getDST() ) * 3600);
   s += ",\"v\":\""; s += ut.ValueText(0);
-  s += "\",\"u\":\""; s += ut.m_MData.szUnit;
+  s += "\",\"u\":\""; s += ut.UnitText();
   s += "\",\"v1\":\""; s += ut.ValueText(1);
   s += "\",\"v2\":\""; s += ut.ValueText(2);
   s += "\",\"v3\":\""; s += ut.ValueText(3);
@@ -135,8 +135,12 @@ String rangesJson()
   if(sel >= 3) sel = 0;
 
   int i;
-  String s = "range;{\"r\":[";
+  String s = "range;{\"rs\":";
+  s += ut.m_MData.Range;
+  s += ",\"os\":";
+  s += ut.m_MData.Select;
 
+  s += ",\"r\":[";
   for(i = 0; rangeList[sw][sel][i]; i++)
   {
     if(i) s += ",";
@@ -485,7 +489,7 @@ void loop()
   {
     display.clear();
     display.drawPropString( 2, 23, ut.ValueText(0) );
-    display.drawPropString(80, 47, ut.m_MData.szUnit );
+    display.drawPropString(80, 47, ut.UnitText() );
     display.display();
   }
 }
