@@ -77,6 +77,7 @@ eeMem eemem;
 UT181Interface ut;
 
 uint16_t displayTimer;
+uint8_t oldSW, oldSel;
 
 String dataJson()
 {
@@ -96,6 +97,64 @@ String dataJson()
   s += ",\"md\":"; s += nMod;
   s += ",\"st\":"; s += ut.StatusBits();
   s += "}\n";
+  return s;
+}
+
+String rangesJson()
+{
+  static char *rangeList[10][3][10] = {
+    {{"Auto", "6", "60", "600", "1000", NULL}, {"Auto", NULL}, {"Auto", NULL}},
+    {{"Auto", "600", "60", NULL}, {"Auto", NULL}, {"Auto",NULL}},
+    {{"Auto", "6", "60", "600", "1000", NULL}, {"Auto",NULL}, {"Auto",NULL}},
+    {{"Auto", "60", "600", NULL}, {"Auto",NULL}, {"Auto",NULL}},
+    {{"Auto", "600", "6k", "60k", "600k", "6M", "60M", NULL}, {"Auto",NULL}, {"Auto",NULL} },
+    {{"Auto",NULL}, {"Auto", "6n", "60n", "600n", "6µ", "60µ", "600µ", "6m", "60m", NULL},{"Auto",NULL}},
+    {{"Auto", "60", "600", "6k", "60k", "600k", "6M", "60M", NULL},
+      {"Auto", "60", "600", "6k", "60k", NULL}, {"Auto",NULL} },
+    {{"Auto", "600", "6000", NULL}, {"Auto", "600", "6000", NULL}, {"Auto",NULL} },
+    {{"Auto", "60", "600", NULL}, {"Auto", "60", "600", NULL}, {"Auto",NULL} },
+    {{"Auto",NULL}, {"Auto",NULL}, {"Auto",NULL} },
+  };
+
+  static char *optList[10][3][10] = {
+    {{"VAC", "VAC,Hz", "Peak", "LowPass", "dBV", "dBM", NULL}, {NULL}, {NULL}},
+    {{"mVAC", "mVAC,Hz", "Peak", "AC+DC", NULL}, {NULL}, {NULL}},
+    {{"VDC", "AC+DC", "Peak", NULL}, {NULL}, {NULL} },
+    {{"mVDC", "Peak", NULL}, {"T1,T2", "T2,T1", "T1-T2", "T2-T1", NULL}, {"T1,T2", "T2,T1", "T1-T2", "T2-T1", NULL}},
+    {{"Ohms",NULL}, {"Short", "Open", NULL}, {"nS", NULL}},
+    {{"Normal", "Alarm", NULL}, {"Cap", NULL}, {NULL}},
+    {{"Hz", NULL}, {"%", NULL}, {"Pulse", NULL}},
+    {{"µADC", "AC+DC", "Peak", NULL}, {"µAAC", "µAAC,Hz", "Peak", NULL}, {NULL}},
+    {{"mADC", "AC+DC", "Peak", NULL}, {"mAAC", "mAAC,Hz", "Peak", NULL}, {NULL}},
+    {{"ADC", "AC+DC", "Peak", NULL}, {"AAC", "AAC,Hz", "Peak", NULL}, {NULL}},
+  };
+
+  uint8_t sw = ut.m_MData.Switch - 1;
+  if(sw >= 10) sw = 0;
+  uint8_t sel = ut.m_MData.Select - 1;
+  if(sel >= 3) sel = 0;
+
+  int i;
+  String s = "range;{\"r\":[";
+
+  for(i = 0; rangeList[sw][sel][i]; i++)
+  {
+    if(i) s += ",";
+    s += "[\"";
+    s += rangeList[sw][sel][i];
+    s += "\"]";
+  }
+  s += "],\"o\":[";
+
+  for(i = 0; optList[sw][sel][i]; i++)
+  {
+    if(i) s += ",";
+    s += "[\"";
+    s += optList[sw][sel][i];
+    s += "\"]";
+  }
+
+  s += "]}";
   return s;
 }
 
@@ -212,6 +271,7 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       client->text(dataJson());
       client->text(settingsJson());
       client->ping();
+      oldSW = 20;
       break;
     case WS_EVT_DISCONNECT:    //client disconnected
       break;
@@ -364,7 +424,6 @@ void loop()
 {
   static uint8_t hour_save, sec_save;
   static uint8_t cnt = 0;
-  bool bNew;
 
   MDNS.update();
 #ifdef OTA_ENABLE
@@ -376,6 +435,13 @@ void loop()
 
   if(ut.Updated())
     ws.textAll(dataJson());
+
+  if(oldSW != ut.m_MData.Switch || oldSel != ut.m_MData.Select)
+  {
+    oldSW = ut.m_MData.Switch;
+    oldSel = ut.m_MData.Select;
+    ws.textAll(rangesJson());
+  }
 
   if(sec_save != second()) // only do stuff once per second (loop is maybe 20-30 Hz)
   {
