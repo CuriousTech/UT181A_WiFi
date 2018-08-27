@@ -15,27 +15,53 @@ background-image: linear-gradient(top, #ffffff, #50a0ff);
 background-clip: padding-box;
 }
 body{width:340px;font-family: Arial, Helvetica, sans-serif;}
-.style5 {
-border-radius: 5px;
-box-shadow: 0px 0px 15px #000000;
-background-image: -moz-linear-gradient(top, #ff00ff, #ffa0ff);
-background-image: -ms-linear-gradient(top, #ff00ff, #ffa0ff);
-background-image: -o-linear-gradient(top, #ff00ff, #ffa0ff);
-background-image: -webkit-linear-gradient(top, #ff0000, #ffa0a0);
-background-image: linear-gradient(top, #ff00ff, #ffa0ff);
+.range{
+  overflow: hidden;
 }
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+.dropbtn {
+    background-color: #50a0ff;
+    color: white;
+    padding: 1px;
+    font-size: 12px;
+    border: none;
+}
+.btn {
+    background-color: #50a0ff;
+    color: white;
+    padding: 1px;
+    font-size: 12px;
+    min-width: 56px;
+    border: none;
+}
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: #f1f1f1;
+    min-width: 60px;
+    min-height: 120px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+}
+.dropdown:hover .dropdown-content {display: block;}
+.dropdown:hover .dropbtn {background-color: #3e8e41;}
 </style>
 <script type="text/javascript">
 a=document.all
 oledon=0;v=0;min=-60;max=60;mod=5;st=1073676544
+va=new Array()
 function startWS(){
 draw_bar()
-ws = new WebSocket("ws://"+window.location.host+"/ws")
-//ws = new WebSocket("ws://192.168.0.109/ws")
+draw_chart()
+//ws = new WebSocket("ws://"+window.location.host+"/ws")
+ws = new WebSocket("ws://192.168.0.109/ws")
 ws.onopen = function(evt) { }
 ws.onclose = function(evt) { alert("Connection closed."); }
 ws.onmessage = function(evt) {
- console.log(evt.data)
+// console.log(evt.data)
  lines = evt.data.split(';')
  event=lines[0]
  data=lines[1]
@@ -56,21 +82,47 @@ ws.onmessage = function(evt) {
  a.v2.innerHTML=d.v2
  a.v3.innerHTML=d.v3
  v=+d.v
+ va.push(v)
  min=+d.mn
  max=+d.mx
  mod=+d.md
  st=+d.st
  draw_bar()
+ draw_chart()
  }
  else if(event == 'alert')
  {
   alert(data)
+ }
+ else if(event == 'range')
+ {
+  d=JSON.parse(data)
+  for(i=0;i<6;i++){
+   item=document.getElementById('r'+i)
+   item.setAttribute('style',i<d.r.length?'':'display:none')
+//   if(i==idx) item.setAttribute('style','background-color:red')
+   item.innerHTML=d.r[i]
+  }
+  for(i=0;i<6;i++){
+   item=document.getElementById('o'+i)
+   item.setAttribute('style',i<d.o.length?'':'display:none')
+//   if(i==idx) item.setAttribute('style','background-color:red')
+   item.innerHTML=d.o[i]
+  }
  }
 }
 }
 function setVar(varName, value)
 {
  ws.send('cmd;{"'+varName+'":'+value+'}')
+}
+function setA(n)
+{
+ setVar('range', n)
+}
+function setOpt(n)
+{
+ setVar('sel', n)
 }
 function oled(){
 oledon=!oledon
@@ -80,7 +132,7 @@ a.OLED.value=oledon?'ON ':'OFF'
 
 function draw_bar(){
 try {
-	var c2 = document.getElementById('canva')
+	var c2 = document.getElementById('bar')
 	ctx = c2.getContext("2d")
 	ctx.fillStyle = "#000";
 	ctx.fillRect(0,0,c2.width,c2.height)
@@ -101,14 +153,12 @@ try {
 			ctx.beginPath()
 		    ctx.moveTo(x, 15);
 		    ctx.lineTo(x, 24);
-			ctx.closePath()
 		}
 		else
 		{
 			ctx.beginPath()
 		    ctx.moveTo(x, 18);
 		    ctx.lineTo(x, 24);
-			ctx.closePath()
 		}
 		ctx.stroke()
 	}
@@ -142,19 +192,90 @@ try {
 	}
 }catch(err){}
 }
-
+function draw_chart(){
+try {
+	var c=document.getElementById('chart')
+	ctx = c.getContext("2d")
+	if(va.length>c.width-19) va.shift()
+	ctx.fillStyle = "#222"
+	ctx.fillRect(0,0,c.width,c.height)
+	ctx.fillStyle = "#FFF"
+	ctx.lineWidth = 1
+	ctx.font = "bold 10px sans-serif"
+	ctx.textAlign="right"
+	h=c.height-20
+	fVal = min
+	for(i=6;i>=0;i--)
+	{
+		y=i/6*h+12
+		ctx.strokeStyle = "#FFF"
+		ctx.fillText(fVal, 20, y+3)
+		fVal+=(max-min)/6
+		ctx.strokeStyle = "#555"
+		ctx.beginPath()
+	    ctx.moveTo(21, y)
+	    ctx.lineTo(c.width, y)
+		ctx.stroke()
+	}
+	if(min<0){
+		base=h/2
+		range=h/2
+	}else{
+		base=h
+		range=h
+	}
+	ciel=max
+	y=base-(va[0]/ciel*range)
+	ctx.strokeStyle = "#FFF"
+	ctx.beginPath()
+    ctx.moveTo(20, y);
+	for(i=1,x=21;i<va.length;i++,x++)
+	{
+		y=base-(va[i]/ciel*range)
+	    ctx.lineTo(x, y)
+	}
+	ctx.stroke()
+}catch(err){}
+}
 </script>
 <body bgcolor="black" text="silver"  onload="{startWS()}">
 <div><h3 align="center">WiFi UT181A</h3>
 <table align=center width=320>
 <tr align=center><td><div id="time"> 0:00:00 AM</div></td><td></td></tr>
 <tr align=center><td><div id="value" style="font-size:xx-large">0L</div></td><td><div id="unit">DCV</div></td></tr>
-<tr><td colspan=2><canvas id="canva" width="300" height="40" style="float:center"></td></tr>
+<tr><td colspan=2><canvas id="bar" width="300" height="40" style="float:center"></td></tr>
 <tr><td><div id="v1">0L</div></td><td><div id="u1"></div></td></tr>
 <tr><td><div id="v2">0L</div></td><td><div id="u2"></div></td></tr>
 <tr><td><div id="v3">0L</div></td><td><div id="u3"></div></td></tr>
-<tr><td><input id='dc' type=text size=4 value='10'></td>
-<td align=center><input type="button" value="Hold" id="hold" onClick="{setVar('hold', 0)}"></td></tr>
+<tr><td><input type="button" value="Hold" id="hold" onClick="{setVar('hold', 0)}">
+
+<div class="dropdown">
+  <button class="dropbtn">Range</button>
+  <div class="dropdown-content">
+  <button class="btn" id="r0" onclick="setA(0)">Auto</button>
+  <button class="btn" id="r1" onclick="setA(1)">6</button>
+  <button class="btn" id="r2" onclick="setA(2)">60</button>
+  <button class="btn" id="r3" onclick="setA(3)">600</button>
+  <button class="btn" id="r4" onclick="setA(4)">6000</button>
+  <button class="btn" id="r5" onclick="setA(5)">10000</button>
+  </div>
+</div>
+<div class="dropdown">
+  <button class="dropbtn">Option</button>
+  <div class="dropdown-content">
+  <button class="btn" id="o0" onclick="setOpt(0)">Opt</button>
+  <button class="btn" id="o1" onclick="setOpt(1)">0</button>
+  <button class="btn" id="o2" onclick="setOpt(2)">0</button>
+  <button class="btn" id="o3" onclick="setOpt(3)">0</button>
+  <button class="btn" id="o4" onclick="setOpt(4)">0</button>
+  <button class="btn" id="o5" onclick="setOpt(5)"></button>
+  </div>
+</div>
+<input type="button" value="REL" id="REL" onClick="{setVar('rel', 0)}"><input id='rval' type=text size=4 value='0'></td>
+<td><input type="button" value="M/M" id="M/M" onClick="{setVar('mm', 0)}"></td></tr>
+<tr><td></td><td></td></tr>
+<tr><td colspan=2><canvas id="chart" width="300" height="300" style="float:center"></td></tr>
+<tr><td></td><td></td></tr>
 <tr><td>OLED: <input type="button" value="ON" id="OLED" onClick="{oled()}"></td><td><input type="submit" value="Setup" onClick="window.location='/s';"></td></tr>
 </table>
 &nbsp
