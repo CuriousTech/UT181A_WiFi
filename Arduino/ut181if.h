@@ -43,8 +43,7 @@ enum eSwitch{
 
 #pragma pack(push, 1)
 
-union uniDate{
-  uint32_t dw;
+struct uniDate{
   uint32_t year:6;
   uint32_t month:4;
   uint32_t day:5;
@@ -86,7 +85,7 @@ struct Record
 struct SaveRec
 {
   uniDate Date;
-  uint8_t dataType;
+  uint8_t switchSel;
   uint8_t Unk[2];
   uint8_t Switch:4;
   uint8_t Select:4;
@@ -96,7 +95,7 @@ struct SaveRec
   union tag_u
   {
     uint8_t bytes[60];
-    struct a{
+    struct{
       char szLabel0[8];
       MValue Value11;
       char szLabel1[8];
@@ -106,8 +105,8 @@ struct SaveRec
       char szLabel3[8];
       MValue Value14;
       char szLabel4[8];
-    };
-    struct b{
+    } a;
+    struct{
       MValue Value21;
       uint32_t dwTime1;
       MValue Value22;
@@ -115,8 +114,8 @@ struct SaveRec
       MValue Value23;
       uint32_t dwTime3;
       char szLabel[8];
-    };
-  }u;
+    } b;
+  } u;
 };
 
 union UData
@@ -219,8 +218,9 @@ public:
   void Connect(bool bCon);
   bool Updated(void);
   bool WriteData(uint8_t *pData, int len);
-  char *TimeText(uniDate dt);
+  const char *convertDate(uniDate &dt);
   char *ValueText(int which);
+  char *ValueText(MValue &mv);
   char *UnitText(void);
   int DisplayCnt(void);
   void SetRange(uint8_t n);
@@ -244,12 +244,11 @@ private:
   void decodeSamples(uint8_t *p, uint8_t count);
   void getRecordData(void);
   void startRecordRetreval(int nItem);
-  void AllocChart(uint32_t dwSize);
   void Save(void);
   void getSave(uint16_t nItem);
   void DeleteAllSave(void);
 
-  uint8_t  m_buffer[64]; // 3200 required for records
+  uint8_t  m_buffer[3200]; // 3200 required for records
   uint8_t  m_idx;
   uint8_t  m_state;
   uint16_t m_len;
@@ -257,8 +256,6 @@ private:
 
   uint16_t  m_nSaves;
   uint16_t  m_nRecords;
-  SaveRec  *m_pSave;
-  Record   *m_pRecords;
   ChartData m_cData;
   uint8_t   m_nRecReq;
   int    m_nRecIdx;
@@ -268,6 +265,7 @@ private:
   int    m_nRecDataIndex;
   int    m_nRecordSampleItem;
   bool   m_bSign;
+  uint32_t m_keepAlive;
 public:
   MData   m_MData;
   bool    m_bConnected;
