@@ -1,14 +1,17 @@
 #include "ut181if.h"
+#include <TimeLib.h>
 
 extern void sendBinData(uint8_t *p, int len);
-extern void sendSavesList(int nSaves);
-extern void sendRecordsList(int nRecords);
+extern void sendSaveEntry(SaveRec *pRec);
+extern void sendRecordEntry(Record *pRecord);
+extern void sendDbg(String s);
 
 void UT181Interface::service()
 {
   while(Serial.available())
   {
     uint8_t c = Serial.read();
+    m_keepAlive = now();
 
     switch(m_state)
     {
@@ -41,12 +44,16 @@ void UT181Interface::service()
             digitalWrite(2, LOW);
             delay(5);
             digitalWrite(2, HIGH);
-//            sendBinData("ERR", 3);
           }
           m_state = 0;
         }
         break;
     }
+  }
+  if( (now() - m_keepAlive) > 4)
+  {
+    m_keepAlive = now();
+    m_bConnected = false;
   }
 }
 
@@ -63,7 +70,6 @@ bool UT181Interface::Updated()
 void UT181Interface::process_sentence(uint16_t len)
 {
   sendBinData(m_buffer, len);
-  m_Updated++;
   switch(m_buffer[0])
   {
     case 0x01:  // 1 = command respsonses
@@ -71,19 +77,28 @@ void UT181Interface::process_sentence(uint16_t len)
           // 01 45 52 9D = 'ER'
           // 01 49 4E 56 = 'INV'
       m_bConnected = true;
+      if(m_nRecReq)
+      {
+        GetRecordSeq();
+      }
+      if(m_bGetRecStart)
+      {
+        m_bGetRecStart = false;
+        getRecordData();
+      }
       break;
     case 0x02: // main meter data
       m_bConnected = true;
       memcpy(&m_MData, m_buffer + 1, sizeof(MData));
+      m_Updated++;
       break;
-    case 0x03: // save data
-      if(m_pSave == NULL || m_nRecIdx >= m_nSaves)
+    case 0x03: // save entry
+      if(m_nRecIdx >= m_nSaves)
       {
         m_nRecReq = 0;
         break;
       }
-
-      memcpy(&m_pSave[m_nRecIdx], m_buffer + 1, sizeof(SaveRec));
+      sendSaveEntry( (SaveRec*)(m_buffer + 1));
 
       if(++m_nRecIdx < m_nSaves)
         GetRecordSeq(); // get more
@@ -94,14 +109,14 @@ void UT181Interface::process_sentence(uint16_t len)
       }
       break;
 
-    case 0x04: // record data
-      if(m_pRecords == NULL || m_nRecIdx >= m_nRecords)
+    case 0x04: // record entry
+      if(m_nRecIdx >= m_nRecords)
       {
         m_nRecReq = 0;
         break;
       }
 
-      memcpy(&m_pRecords[m_nRecIdx], m_buffer + 1, sizeof(Record));
+      sendRecordEntry( (Record*)(m_buffer + 1));
 
       if(++m_nRecIdx < m_nRecords)
         GetRecordSeq();
@@ -125,18 +140,12 @@ void UT181Interface::process_sentence(uint16_t len)
         case 0x08: // saves
           m_nSaves = getWord(m_buffer + 2); // 72 08 03 00 83
           Connect(false); // disable to read
-          if(m_pSave)
-            delete m_pSave;
-          m_pSave = new SaveRec[m_nSaves];
-          m_nRecReq = 1;
+          m_nRecReq = 1; // setup to start on next ack
           m_nRecIdx = 0;
           break;
         case 0x0E: // records
           m_nRecords = getWord(m_buffer + 2); // 72 0E 02 00 88
           Connect(false); // disable main data to read
-          if(m_pRecords)
-            delete m_pRecords;
-          m_pRecords = new Record[m_nRecords];
           m_nRecReq = 2;
           m_nRecIdx = 0;
           break;
@@ -153,39 +162,16 @@ uint16_t UT181Interface::getWord(uint8_t *p)
 
 void UT181Interface::startRecordRetreval(int nItem)
 {
-  if(m_pRecords == NULL || nItem >= m_nRecords)
+  if(nItem >= m_nRecords)
     return;
 
-  AllocChart(m_pRecords[nItem].dwSamples);
+//  AllocChart(m_pRecords[nItem].dwSamples);
   m_nRecDataIndex = 0;
-  m_nRecDataIndexEnd = m_pRecords[nItem].dwSamples;
+//  m_nRecDataIndexEnd = m_pRecords[nItem].dwSamples;
   m_nRecordItem = nItem + 1;
   m_bGetRecStart = true;
   m_nRecordSampleItem = nItem;
   Connect(false);
-}
-
-void UT181Interface::AllocChart(uint32_t dwSize)
-{
-  if(m_cData.pData)
-    delete m_cData.pData;
-  memset(&m_cData, 0, sizeof(m_cData));
-  m_cData.pData = new ItemData[dwSize + 254];
-  memset(m_cData.pData, 0, sizeof(ItemData) * (dwSize + 254) );
-  m_cData.dwAvail = dwSize;
-}
-
-float UT181Interface::GetValueScale(char *pszUnit)
-{
-  switch(pszUnit[0])
-  {
-    case 'k': return 1000;
-    case 'M': return 1000000;
-    case 'm': return 0.001f;
-    case 'u': return 0.000001f;
-    case 'n': return 0.000000001f;
-    default: return 1;
-  }
 }
 
 void UT181Interface::Connect(bool bCon)
@@ -306,19 +292,13 @@ void UT181Interface::GetRecordSeq()
   {
     case 1:
       if(m_nRecIdx > m_nSaves)
-      {
         Connect(true);
-        sendSavesList(m_nSaves);
-      }
       else
         getSave(m_nRecIdx+1);
       break;
     case 2:
       if(m_nRecIdx > m_nRecords)
-      {
         Connect(true);
-        sendRecordsList(m_nRecords);
-      }
       else
         getRecord(m_nRecIdx+1);
       break;
@@ -343,6 +323,7 @@ void UT181Interface::getRecordCount()
 
 void UT181Interface::decodeSamples(uint8_t *p, uint8_t count)
 {
+/*
   float fScale = GetValueScale(m_pRecords[m_nRecordSampleItem].szUnit);
   int n = m_nRecDataIndex;
   int tick = 0;
@@ -368,6 +349,20 @@ void UT181Interface::decodeSamples(uint8_t *p, uint8_t count)
       m_cData.dwIndex++;
       m_cData.dwCount++;
     }
+  }
+  */
+}
+
+float UT181Interface::GetValueScale(char *pszUnit)
+{
+  switch(pszUnit[0])
+  {
+    case 'k': return 1000;
+    case 'M': return 1000000;
+    case 'm': return 0.001f;
+    case 'u': return 0.000001f;
+    case 'n': return 0.000000001f;
+    default: return 1;
   }
 }
 
@@ -420,12 +415,25 @@ void UT181Interface::DeleteAllSave() // Saves
   Write(cmd, sizeof(cmd) );
 }
 
-char *UT181Interface::TimeText(uniDate dt)
+const char *UT181Interface::convertDate(uniDate &dt)
 {
-  static char szDate[20];
-  sprintf(szDate, "%d/%02d/%02d %2d:%02d:%02d",
-    dt.year + 2000, dt.month, dt.day, dt.hours, dt.minutes, dt.seconds);
-  return szDate;
+  static String s;
+  s = String(dt.year + 2000) + "/";
+  if(dt.month<10) s += "0";
+  s += dt.month;
+  s += "/";
+  if(dt.day<10) s += "0";
+  s += dt.day;
+  s += " ";
+  if(dt.hours<10) s += " ";
+  s += dt.hours;
+  s += ":";
+  if(dt.minutes<10) s += "0";
+  s += dt.minutes;
+  s += ":";
+  if(dt.seconds<10) s += "0";
+  s += dt.seconds;
+  return s.c_str();
 }
 
 int UT181Interface::DisplayCnt()
@@ -451,6 +459,7 @@ char *UT181Interface::UnitText()
 {
   char *p = (m_MData.MinMax) ? m_MData.u.MM.szUnit : m_MData.u.Std.szUnit;
   if(*p == 0xB0) *p = '@'; // convert degree to ampersand
+  if(p[1] == 0xB0) p[1] = '@'; // convert degree to ampersand
 }
 
 char *UT181Interface::ValueText(int which)
@@ -478,6 +487,11 @@ char *UT181Interface::ValueText(int which)
       case 3:  Value = m_MData.u.Ext.Value3; break;
     }
 
+  return ValueText(Value);
+}
+
+char *UT181Interface::ValueText(MValue &Value)
+{
   static char szVal[16];
 
   if(Value.Blank)
