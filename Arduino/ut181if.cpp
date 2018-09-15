@@ -1,10 +1,8 @@
 #include "ut181if.h"
 
 extern void sendBinData(uint8_t *p, int len);
-
-UT181Interface::UT181Interface()
-{
-}
+extern void sendSavesList(int nSaves);
+extern void sendRecordsList(int nRecords);
 
 void UT181Interface::service()
 {
@@ -74,28 +72,9 @@ void UT181Interface::process_sentence(uint16_t len)
           // 01 49 4E 56 = 'INV'
       m_bConnected = true;
       break;
-    case 0x72:  // number of saves/records
-      switch(m_buffer[1])
-      {
-        case 0x08: // saves
-          m_nSaves = getWord(m_buffer + 2); // 72 08 03 00 83
-          Connect(false); // disable to read
-          if(m_pSave)
-            delete m_pSave;
-          m_pSave = new SaveRec[m_nSaves];
-          m_nRecReq = 1;
-          m_nRecIdx = 0;
-          break;
-        case 0x0E: // records
-          m_nRecords = getWord(m_buffer + 2); // 72 0E 02 00 88
-          Connect(false); // disable main data to read
-          if(m_pRecords)
-            delete m_pRecords;
-          m_pRecords = new Record[m_nRecords];
-          m_nRecReq = 2;
-          m_nRecIdx = 0;
-          break;
-      }
+    case 0x02: // main meter data
+      m_bConnected = true;
+      memcpy(&m_MData, m_buffer + 1, sizeof(MData));
       break;
     case 0x03: // save data
       if(m_pSave == NULL || m_nRecIdx >= m_nSaves)
@@ -140,37 +119,30 @@ void UT181Interface::process_sentence(uint16_t len)
       else // end of record, restart
         Connect(true);
       break;
-    case 0x02: // main meter data
-      m_bConnected = true;
-      memcpy(&m_MData, m_buffer + 1, sizeof(MData));
+    case 0x72:  // number of saves/records
+      switch(m_buffer[1])
+      {
+        case 0x08: // saves
+          m_nSaves = getWord(m_buffer + 2); // 72 08 03 00 83
+          Connect(false); // disable to read
+          if(m_pSave)
+            delete m_pSave;
+          m_pSave = new SaveRec[m_nSaves];
+          m_nRecReq = 1;
+          m_nRecIdx = 0;
+          break;
+        case 0x0E: // records
+          m_nRecords = getWord(m_buffer + 2); // 72 0E 02 00 88
+          Connect(false); // disable main data to read
+          if(m_pRecords)
+            delete m_pRecords;
+          m_pRecords = new Record[m_nRecords];
+          m_nRecReq = 2;
+          m_nRecIdx = 0;
+          break;
+      }
       break;
   }
-}
-
-float UT181Interface::bin2float(uint8_t *val)
-{
-  uint32_t *dwP = (uint32_t*)val;
-  uint32_t dwValue = *dwP;
-  float *pf = (float *)&dwValue;
-  return *pf;
-}
-
-void UT181Interface::getMValue(MValue *mv, uint8_t *p)
-{
-  memcpy((uint8_t*)mv, p, sizeof(MValue));
-}
-
-void UT181Interface::float2bin(float fValue, uint8_t *p)
-{
-  uint32_t *pd = (uint32_t*)&fValue;
-  uint32_t *dwP = (uint32_t*)p;
-  *dwP = *pd;
-}
-
-uint32_t UT181Interface::getLong(uint8_t *p)
-{
-  uint32_t *dwP = (uint32_t*)p;
-  return *dwP;
 }
 
 uint16_t UT181Interface::getWord(uint8_t *p)
@@ -280,27 +252,23 @@ void UT181Interface::SetSelect(uint8_t nSel, bool bRel, float fValue)
   Write(cmd, sizeof(cmd) );
   if(bRel)
   {
-    static uint8_t val[]= {3, 0,0,0,0};
-    float2bin(fValue, val + 1 );
-    Write(val, sizeof(val) );
+      #pragma pack(push, 1)
+      struct relCmd
+      {
+        uint8_t Cmd;
+        float fVal;
+      };
+      #pragma pack(pop)
+
+      relCmd rc = {3, fValue};
+
+      Write((uint8_t*)&rc, sizeof(rc) );
   }
 }
 
 float UT181Interface::GetfValue()
 {
   return m_MData.Value.fValue;
-}
-
-bool UT181Interface::RelState()
-{
-   switch(m_MData.dataType)
-   {
-      case 0x10: // rel
-      case 0x16: // rel temp
-      case 0x1E: // dbV
-        return true;
-   }
-   return false;
 }
 
 void UT181Interface::SetRange(uint8_t n)  // 0 = auto, 1 = range 1...8
@@ -338,13 +306,19 @@ void UT181Interface::GetRecordSeq()
   {
     case 1:
       if(m_nRecIdx > m_nSaves)
+      {
         Connect(true);
+        sendSavesList(m_nSaves);
+      }
       else
         getSave(m_nRecIdx+1);
       break;
     case 2:
       if(m_nRecIdx > m_nRecords)
+      {
         Connect(true);
+        sendRecordsList(m_nRecords);
+      }
       else
         getRecord(m_nRecIdx+1);
       break;
@@ -448,7 +422,7 @@ void UT181Interface::DeleteAllSave() // Saves
 
 char *UT181Interface::TimeText(uniDate dt)
 {
-  static char szDate[24];
+  static char szDate[20];
   sprintf(szDate, "%d/%02d/%02d %2d:%02d:%02d",
     dt.year + 2000, dt.month, dt.day, dt.hours, dt.minutes, dt.seconds);
   return szDate;
@@ -456,36 +430,27 @@ char *UT181Interface::TimeText(uniDate dt)
 
 int UT181Interface::DisplayCnt()
 {
-  if(m_MData.dataType == 0x27 || m_MData.dataType == 0x2F ) // min/max
-  {
-    return 4;
-  }
+  if(m_MData.MinMax)  return 4;
+  if(m_MData.Rel)     return 3;
+  if(m_MData.Peak)    return 2;
+
   switch(m_MData.dataType)
   {
-      case 0x0A:// dbV
-      case 0x42: // Peak
-      case 0x02: // T1
+      case 0x5:// dbV
+      case 0x1: // T1
         return 2;
-      case 0x10: // rel
-      case 0x16: // rel temp
-      case 0x1E: // dbV
-      case 0x06: // T1-T2 // Todo: fix data for mVac+dc
-      case 0x0E: // Hz Ms
+      case 0x3: // T1-T2 // Todo: fix data for mVac+dc
+      case 0x7: // Hz Ms
         return 3;
-      case 0x2F: // Max min
-      case 0x27: // max min temp
-        return 4;
-      default:
+      default: // 0x4
         return 1;
     }
 }
 
 char *UT181Interface::UnitText()
 {
-  if(m_MData.dataType == 0x27 || m_MData.dataType == 0x2F) // MM
-    return m_MData.u.MM.szUnit;
-  else
-    return m_MData.u.Std.szUnit;
+  char *p = (m_MData.MinMax) ? m_MData.u.MM.szUnit : m_MData.u.Std.szUnit;
+  if(*p == 0xB0) *p = '@'; // convert degree to ampersand
 }
 
 char *UT181Interface::ValueText(int which)
@@ -495,7 +460,7 @@ char *UT181Interface::ValueText(int which)
   if(DisplayCnt()-1 < which)
     return "";
 
-  if(m_MData.dataType == 0x27 || m_MData.dataType == 0x2F) // MM
+  if(m_MData.MinMax)
     switch(which)
     {
       default:  Value = m_MData.Value; break;
@@ -543,13 +508,18 @@ void UT181Interface::RangeMod(int &nMin, int &nMax, int &nMod)
 {
   getSign();
 
+  if(m_MData.Peak)
+  {
+    nMin = nMax = nMod = 0;
+    return;
+  }
+
   switch(m_MData.dataType) // no bar modes
   {
-    case 0x42: // Peak
-    case 0x02: // T1
+    case 0x01: // T1
       nMin = nMax = nMod = 0;
       return;
-    case 0x06: // T1-T2 // Todo: fix data for mVac+dc
+    case 0x3: // T1-T2 // Todo: fix data for mVac+dc
       if(m_MData.Switch == eSwitch_mVDC)
       {
         nMin = nMax = nMod = 0;
@@ -642,9 +612,6 @@ uint16_t UT181Interface::StatusBits()
 {
   uint16_t bits = 0;
 
-  if(m_bSign) // signed state
-    bits |= 1;
-
     // Switch modes
   switch(m_MData.Switch)
   {
@@ -666,38 +633,17 @@ uint16_t UT181Interface::StatusBits()
       break;
   }
 
-  if(m_MData.Over) // Over range
-     bits |= (1<<3);
+  if(m_bSign)         bits |= 1;
+  if(m_MData.Over)    bits |= (1<<3);
+  if(m_MData.Auto)    bits |= (1<<4);
+  if(m_MData.Hold)    bits |= (1<<5);
+  if(m_MData.Comp)    bits |= (1<<6);
+  if(m_MData.Peak)    bits |= (1<<7);
+  if(m_MData.Recording) bits |= (1<<8);
+  if(m_MData.LeadErr) bits |= (1<<9);
+  if(m_MData.Rel)     bits |= (1<<10);
+  if(m_MData.MinMax)  bits |= (1<<11);
+  if(m_MData._T1)     bits |= (1<<12);
 
-  if(m_MData.Auto) // auto/manual
-     bits |= (1<<4);
-
-  if(m_MData.Hold) // hold
-     bits |= (1<<5);
-
-  if(m_MData.Comp)
-     bits |= (1<<6);
-
-  if(m_MData.u.Comp.Fail)
-     bits |= (1<<7);
-
-  if(m_MData.Recording)
-     bits |= (1<<8);
-
-  if(m_MData.LeadError)
-     bits |= (1<<9);
-
-  switch(m_MData.dataType)
-  {
-    case 0x10: // rel
-    case 0x16: // rel temp
-    case 0x1E: // dbV
-      bits |= (1<<10); // rel
-      break;
-    case 0x2F: // Max min
-    case 0x27: // max min temp
-      bits |= (1<<11); // MM
-      break;
-  }
   return bits;
 }
