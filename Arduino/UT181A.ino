@@ -91,11 +91,23 @@ String dataJson()
   s += "\",\"v1\":\""; s += ut.ValueText(1);
   s += "\",\"v2\":\""; s += ut.ValueText(2);
   s += "\",\"v3\":\""; s += ut.ValueText(3);
-  s += "\",\"cnt\":"; s += ut.DisplayCnt();
-  s += ",\"mn\":"; s += nMin;
+  s += "\",\"mn\":"; s += nMin;
   s += ",\"mx\":"; s += nMax;
   s += ",\"md\":"; s += nMod;
   s += ",\"st\":"; s += ut.StatusBits();
+
+  if(ut.m_MData.MinMax)
+  {
+    s += ",\"t1\":"; s += ut.m_MData.u.MM.dwTime1;
+    s += ",\"t2\":"; s += ut.m_MData.u.MM.dwTime2;
+    s += ",\"t3\":"; s += ut.m_MData.u.MM.dwTime3;
+  }
+  else if(ut.m_MData.Recording)
+  {
+    s += ",\"t1\":"; s += ut.m_MData.u.RecTimer.dwElapsed;
+    s += ",\"t2\":"; s += ut.m_MData.u.RecTimer.dwRemain;
+    s += ",\"t3\":"; s += ut.m_MData.u.RecTimer.dwSamples;
+  }
   s += "}\n";
   return s;
 }
@@ -157,8 +169,66 @@ String rangesJson()
     s += optList[sw][sel][i];
     s += "\"]";
   }
+  s += ']';
+  if(ut.m_MData.Rel || ut.m_MData.Peak || ut.m_MData.dataType == 1 || ut.m_MData.dataType == 3)
+  {
+    s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
+    s += "\",\"u2\":\""; s += ut.m_MData.u.Ext.szUnit2;
+    s += "\",\"u3\":\"\""; s += ut.m_MData.u.Ext.szUnit3; s += "\"";
+  }
+  else
+  {
+    s += ",\"u1\":\""; ut.m_MData.u.Std.szUnit2;
+    s += "\",\"u2\":\"\"";
+    s += ",\"u3\":\"\"";
+  }
 
-  s += "]}";
+  if(ut.m_MData.MinMax)
+  {
+      s += ",\"l0\":\"MAX MIN\"";
+      s += ",\"l1\":\"Maximum\"";
+      s += ",\"l2\":\"Average\"";
+      s += ",\"l3\":\"Minimum\"";
+  }
+  else if(ut.m_MData.Recording)
+  {
+      s += ",\"l0\":\"REC\""; 
+      s += ",\"l1\":\"Elapsed Time:\"";
+      s += ",\"l2\":\"\"Remaining Time:\"";
+      s += ",\"l3\":\"\"Samples:\"";
+  }
+  else if(ut.m_MData.Rel)
+  {
+      s += ",\"l0\":\"REL\""; 
+      s += ",\"l1\":\"Reference:\"";
+      s += ",\"l2\":\"\"Measurement:\"";
+      s += ",\"l3\":\"\"";
+  }
+  else if(ut.m_MData.dataType == 1) // Temp
+  {
+      s += ",\"l0\":\"\"";
+      if(ut.m_MData.tempReverse)
+        s += ",\"l1\":\"T1\"";
+      else
+        s += ",\"l1\":\"T2\"";
+      s += ",\"l2\":\"\"";
+      s += ",\"l3\":\"\"";
+  }
+  else if(ut.m_MData.dataType == 3) // Subtractive temp
+  {
+      s += ",\"l0\":\"\"";
+      s += ",\"l1\":\"T1\"";
+      s += ",\"l2\":\"T2\"";
+      s += ",\"l3\":\"\"";
+  }
+  else // normal
+  {
+      s += ",\"l0\":\"\""; 
+      s += ",\"l1\":\"\"";
+      s += ",\"l2\":\"\"";
+      s += ",\"l3\":\"\"";
+  }
+  s += "}";
   return s;
 }
 
@@ -216,6 +286,8 @@ const char *jsonList1[] = { "cmd",
   "range",
   "sel",
   "rel",
+  "rec",
+  "svs",
   NULL
 };
 
@@ -248,15 +320,32 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 6: // rel
           sel = ut.m_MData.Select;
-          if(ut.RelState())
+          if(ut.m_MData.Rel)
             ut.SetSelect(sel, false, 0);
           else
             ut.SetSelect(sel, true, ut.GetfValue());
+          break;
+        case 7: // records
+          ut.getRecordCount();
+          break;
+        case 8: // saves
+          ut.getSaveCount();
           break;
       }
       break;
   }
 }
+
+void sendSavesList(int nSaves)
+{
+  
+}
+
+void sendRecordsList(int nRecords)
+{
+  
+}
+
 
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
 {  //Handle WebSocket event
@@ -274,6 +363,7 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       client->keepAlivePeriod(50);
       client->text(dataJson());
       client->text(settingsJson());
+      client->text(rangesJson());
       client->ping();
       oldSW = 20;
       break;
@@ -339,6 +429,12 @@ void btnISR() // Prog button on board
   bButtonPressed = true;
 }
 
+void handleFileList(AsyncWebServerRequest *request)
+{
+  String s = "";
+  request->send( 200, "text/html", s );
+}
+
 void setup()
 {
   const char hostName[] ="UT181A";
@@ -361,7 +457,7 @@ void setup()
 
 #ifdef USE_SPIFFS
   SPIFFS.begin();
-  server.addHandler(new SPIFFSEditor("admin", controlPassword));
+  server.addHandler(new SPIFFSEditor("admin", "admin"));
 #endif
 
   // attach AsyncWebSocket
@@ -382,14 +478,37 @@ void setup()
     parseParams(request);
     request->send( 200, "text/html", wifi.page() );
   });
+  server.on( "/files", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
+    handleFileList(request);
+  });
   server.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(200, "text/plain", String(ESP.getFreeHeap()));
   });
+
+#ifdef USE_SPIFFS
+  server.serveStatic("/beep.png", SPIFFS, "/beep.png");
+  server.serveStatic("/shock.png", SPIFFS, "/shock.png");
+  server.serveStatic("/diode.png", SPIFFS, "/diode.png");
+  server.serveStatic("/favicon.ico", SPIFFS, "/favicon.ico");
+#else
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request){
     AsyncWebServerResponse *response = request->beginResponse_P(200, "image/x-icon", favicon, sizeof(favicon));
     response->addHeader("Content-Encoding", "gzip");
     request->send(response);
   });
+  server.on("/beep.png", HTTP_GET, [](AsyncWebServerRequest *request){
+    AsyncWebServerResponse *response = request->beginResponse_P(200, "image/png", beep_png, sizeof(beep_png));
+    request->send(response);
+  });
+  server.on("/shock.png", HTTP_GET, [](AsyncWebServerRequest *request){
+    AsyncWebServerResponse *response = request->beginResponse_P(200, "image/png", shock_png, sizeof(shock_png));
+    request->send(response);
+  });
+  server.on("/diode.png", HTTP_GET, [](AsyncWebServerRequest *request){
+    AsyncWebServerResponse *response = request->beginResponse_P(200, "image/png", diode_png, sizeof(diode_png));
+    request->send(response);
+  });
+#endif
 
   server.onNotFound([](AsyncWebServerRequest *request){
     request->send(404);
@@ -427,7 +546,8 @@ void sendBinData(uint8_t *p, int len)
 void loop()
 {
   static uint8_t hour_save, sec_save;
-  static uint8_t cnt = 0;
+  static uint8_t cnt;
+  static uint32_t oldOpt;
 
   MDNS.update();
 #ifdef OTA_ENABLE
@@ -440,8 +560,9 @@ void loop()
   if(ut.Updated())
     ws.textAll(dataJson());
 
-  if(oldSW != ut.m_MData.Switch || oldSel != ut.m_MData.Select)
+  if(oldSW != ut.m_MData.Switch || oldSel != ut.m_MData.Select || oldOpt != *(uint32_t*)(&ut.m_MData))
   {
+    oldOpt = *(uint32_t*)(&ut.m_MData);
     oldSW = ut.m_MData.Switch;
     oldSel = ut.m_MData.Select;
     ws.textAll(rangesJson());
