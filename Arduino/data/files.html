@@ -1,0 +1,122 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>WiFi UT181A Web Page</title>
+<style type="text/css">
+input{
+border-radius: 5px;
+margin-bottom: 5px;
+box-shadow: 2px 2px 12px #000000;
+background-image: -moz-linear-gradient(top, #ffffff, #50a0ff);
+background-image: -ms-linear-gradient(top, #ffffff, #50a0ff);
+background-image: -o-linear-gradient(top, #ffffff, #50a0ff);
+background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);
+background-image: linear-gradient(top, #ffffff, #50a0ff);
+background-clip: padding-box;
+}
+body{width:340px;font-family: Arial, Helvetica, sans-serif;}
+.btn {
+    background-color: #50a0ff;
+    padding: 1px;
+    font-size: 12px;
+    min-width: 56px;
+    border: none;
+}
+</style>
+<script type="text/javascript">
+a=document.all
+function startWS(){
+ws=new WebSocket("ws://"+window.location.host+"/ws")
+//ws=new WebSocket("ws://192.168.0.109/ws")
+ws.onopen=function(evt){}
+ws.onclose=function(evt){alert("Connection closed.");}
+ws.onmessage=function(evt){
+ console.log(evt.data)
+ lines = evt.data.split(';')
+ event=lines[0]
+ data=lines[1]
+ 
+ if(event == 'settings')
+ {
+	getFiles('svs',0);
+ }
+ else if(event == 'state')
+ {
+	d=JSON.parse(data)
+	dt=new Date(d.t*1000)
+	a.time.innerHTML=dt.toLocaleTimeString()
+ }
+ else if(event == 'alert')
+ {
+  alert(data)
+ }
+ else if(event == 'record')
+ {
+  d=JSON.parse(data)
+  AddFile(1,d.n,d.a)
+ }
+ else if(event == 'save')
+ {
+  d=JSON.parse(data)
+  AddFile(1,d.n,d.a)
+ }
+}
+}
+
+function load(idx)
+{
+  console.log('load ' + idx)
+}
+
+function AddFile(type,name,arr)
+{
+  tr=document.createElement("tr")
+  td=document.createElement("td")
+  inp=document.createElement("input")
+  inp.value=name
+  inp.id=type+(idx<<1)
+  inp.type='button'
+  inp.onclick=function(){load(this.id)}
+  td.appendChild(inp)
+  tr.appendChild(td)
+  for(i=0;i<arr.length;i++){
+	td=document.createElement("td")
+	td.appendChild(document.createTextNode(fixLabel(arr[i])))
+	tr.appendChild(td)
+  }
+  tbody=document.createElement("tbody")
+  tbody.appendChild(tr)
+  document.getElementById("list").appendChild(tbody)
+  idx++
+}
+
+function fixLabel(s)
+{
+  s=String(s).replace(/~/g, '\u03A9')
+  return s.replace(/@/g, '\xB0')
+}
+
+function getFiles(varName)
+{
+ list=document.getElementById("list")
+ while(list.firstChild)
+ {
+	 list.removeChild(list.firstChild)
+ }
+ idx=0
+ ws.send('cmd;{"'+varName+'":0}')
+}
+</script>
+<body bgcolor="black" text="silver"  onload="{startWS()}">
+<div><h3 align="center">UT181A Files</h3>
+
+<table align=center width=320 id="top">
+<tr align=center><td colspan=2><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td width=70></td><td></td></tr>
+<tr><td><input type="button" value="Saves" onClick="{getFiles('svs')}"></td><td><input type="button" value="Records" onClick="{getFiles('rec')}"></td></tr>
+</table>
+&nbsp
+<table style="font-size:x-small" id="list">
+</table>
+</div>
+</body>
+</html>
