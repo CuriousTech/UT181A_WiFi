@@ -112,6 +112,12 @@ String dataJson()
   return s;
 }
 
+void fixDeg(char *p)
+{
+  if(*p == 0xB0) *p = '@'; // convert degree to ampersand
+  if(p[1] == 0xB0) p[1] = '@';
+}
+
 String rangesJson()
 {
   static char *rangeList[10][3][10] = {
@@ -172,12 +178,16 @@ String rangesJson()
   s += ']';
   if(ut.m_MData.Rel || ut.m_MData.Peak || ut.m_MData.dataType == 1 || ut.m_MData.dataType == 3)
   {
+    fixDeg(ut.m_MData.u.Ext.szUnit1);
+    fixDeg(ut.m_MData.u.Ext.szUnit2);
+    fixDeg(ut.m_MData.u.Ext.szUnit3);
     s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
     s += "\",\"u2\":\""; s += ut.m_MData.u.Ext.szUnit2;
     s += "\",\"u3\":\"\""; s += ut.m_MData.u.Ext.szUnit3; s += "\"";
   }
   else
   {
+    fixDeg(ut.m_MData.u.Std.szUnit2);
     s += ",\"u1\":\""; ut.m_MData.u.Std.szUnit2;
     s += "\",\"u2\":\"\"";
     s += ",\"u3\":\"\"";
@@ -336,21 +346,85 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
   }
 }
 
-void sendSavesList(int nSaves)
+void sendSaveEntry(SaveRec *pRec)
 {
-  
+  String s = "save;{\"n\":\"";
+
+  s += ut.convertDate(pRec->Date);
+  s += "\",\"a\":[[\"";
+  s += ut.ValueText(pRec->Value0);
+  s += "\"],[\"";
+
+  switch(pRec->switchSel)
+  {
+    case 0x08:
+      fixDeg(pRec->u.a.szLabel0);
+      s += pRec->u.a.szLabel0;
+      s += "\"]]";
+      break;
+    case 0x02:
+    case 0x0A:
+    case 0x42:
+      fixDeg(pRec->u.a.szLabel1);
+      fixDeg(pRec->u.a.szLabel2);
+      s += pRec->u.a.szLabel1;
+      s += "\"],[\""; s += ut.ValueText(pRec->u.a.Value11);
+      s += "\"],[\""; s += pRec->u.a.szLabel2;
+      s += "\"]]";
+      break;
+    case 0x06:
+    case 0x0E:
+    case 0x1E:
+      fixDeg(pRec->u.a.szLabel0);
+      fixDeg(pRec->u.a.szLabel1);
+      fixDeg(pRec->u.a.szLabel2);
+      s += pRec->u.a.szLabel0;
+      s += "\"],[\""; s += ut.ValueText(pRec->u.a.Value11);
+      s += "\"],[\""; s += pRec->u.a.szLabel1;
+      s += "\"],[\""; s += ut.ValueText(pRec->u.a.Value12);
+      s += "\"],[\""; s += pRec->u.a.szLabel2;
+      s += "\"]]";
+      break;
+    case 0x27:
+    case 0x2F:
+      fixDeg(pRec->u.b.szLabel);
+      s += pRec->u.b.szLabel;
+      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value21);
+      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value22);
+      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value23);
+      s += "\"]]";
+      break;
+  }
+
+  s += "}";
+  ws.textAll(s);
 }
 
-void sendRecordsList(int nRecords)
+void sendRecordEntry(Record *pRecord)
 {
-  
+  String s = "record;{\"n\":\"";
+  s += pRecord->szName;
+  s += "\",\"a\":[[\""; s += ut.convertDate(pRecord->Date);
+  fixDeg(pRecord->szUnit);
+  s += "\"],[\""; s += pRecord->szUnit;
+  s += "\"],[\""; s += pRecord->dwSamples;
+  s += "\"],[\""; s += pRecord->wInterval;
+  s += "\"],[\""; s += pRecord->dwDuration;
+  s += "\"],[\""; s += ut.ValueText(pRecord->mMin);
+  s += "\"],[\""; s += ut.ValueText(pRecord->mAvg);
+  s += "\"],[\""; s += ut.ValueText(pRecord->mMax);
+  s += "\"]]}";
+  ws.textAll(s);
 }
 
+void sendDbg(String s)
+{
+  ws.textAll(s);  
+}
 
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
 {  //Handle WebSocket event
   static bool bRestarted = true;
-  String s;
 
   switch(type)
   {
@@ -478,8 +552,12 @@ void setup()
     parseParams(request);
     request->send( 200, "text/html", wifi.page() );
   });
-  server.on( "/files", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
-    handleFileList(request);
+  server.on( "/files.html", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
+#ifdef USE_SPIFFS
+    request->send( SPIFFS, "/files.html" );
+#else
+    request->send_P( 200, "text/html", files_html );
+#endif
   });
   server.on("/heap", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(200, "text/plain", String(ESP.getFreeHeap()));
