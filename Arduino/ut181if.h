@@ -174,19 +174,25 @@ union UData
 
 struct MData
 {
-  uint8_t  dataType:7;
+  uint8_t  _T1:1;
+  uint8_t  dataType:3;
+  uint8_t  Rel:1;
+  uint8_t  MinMax:1;
+  uint8_t  Peak:1;
   uint8_t  Hold:1;   // byte 0
 
   uint8_t  Auto:1;   // byte 1
   uint8_t  Over:1;   // byte 1
   uint8_t  Unk1:1;
-  uint8_t  LeadError:1;
+  uint8_t  LeadErr:1;
   uint8_t  Comp:1;
   uint8_t  Recording:1;
   uint8_t  Unk2:2;   // byte 1
 
-  uint8_t  option1:4;  // byte 2 (T1-T2 reverse bit 1 and 2)
-  uint8_t  option2:4;
+  uint8_t  Unk3:5; // byte 2
+  uint8_t  tempReverse:1;
+  uint8_t  Unk4:1;
+  uint8_t  TempSubReverse:1;
   uint8_t  Select:4; // byte 3
   uint8_t  Switch:4; // byte 3
   uint8_t  Range:4;  // byte 4
@@ -208,7 +214,7 @@ struct ChartData
 class UT181Interface
 {
 public:
-  UT181Interface();
+  UT181Interface(){};
   void service(void);
   void Connect(bool bCon);
   bool Updated(void);
@@ -219,18 +225,15 @@ public:
   int DisplayCnt(void);
   void SetRange(uint8_t n);
   void SetSelect(uint8_t nSel, bool bRel, float fValue);
-  bool RelState(void);
   float GetfValue(void);
   void Hold(void);
   void MinMax(void);
   void RangeMod(int &nMin, int &nMax, int &nMod);
   void getSign(void);
   uint16_t StatusBits(void);
+  void getRecordCount(void);
+  void getSaveCount(void);
 private:
-  float bin2float(uint8_t *val);
-  void getMValue(MValue *mv, uint8_t *p);
-  void float2bin(float fValue, uint8_t *p);
-  uint32_t getLong(uint8_t *p);
   uint16_t getWord(uint8_t *p);
   float GetValueScale(char *pszUnit);
   uint16_t sum(uint8_t *p, uint16_t len);
@@ -238,14 +241,12 @@ private:
   void process_sentence(uint16_t len);
   void GetRecordSeq(void);
   void getRecord(uint16_t nItem);
-  void getRecordCount(void);
   void decodeSamples(uint8_t *p, uint8_t count);
   void getRecordData(void);
   void startRecordRetreval(int nItem);
   void AllocChart(uint32_t dwSize);
   void Save(void);
   void getSave(uint16_t nItem);
-  void getSaveCount(void);
   void DeleteAllSave(void);
 
   uint8_t  m_buffer[64]; // 3200 required for records
