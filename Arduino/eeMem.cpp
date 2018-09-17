@@ -4,9 +4,10 @@
 eeSet ee = { sizeof(eeSet), 0xAAAA,
   "",  // saved SSID
   "", // router password
-  -5, 0,     // TZ, dst
+  -5, 0,    // TZ, dst
   false,    // OLED
-  55, // rate
+  0,        // exportFormat
+  55,     // rate
 };
 
 eeMem::eeMem()
