@@ -68,7 +68,6 @@ AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 AsyncWebSocket wsb("/bin"); // access at ws://[esp ip]/bin
 
 uint32_t binClientID; // connected binary client
-
 void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue);
 JsonParse jsonParse(jsonCallback);
 UdpTime utime;
@@ -79,6 +78,22 @@ UT181Interface ut;
 uint16_t displayTimer;
 uint8_t oldSW, oldSel;
 
+String timeFmt(uint32_t val)
+{
+  int s = val % 60;
+  int m = val / 60 % 60;
+  static String st;
+
+  st = String(val/3600);
+  st += ":";
+  if(m < 10) st += "0";
+  st += m;
+  st += ":";
+  if(s < 10) st += "0";
+  st += s;
+  return st;
+}
+
 String dataJson()
 {
   int nMin, nMax, nMod;
@@ -88,9 +103,22 @@ String dataJson()
   s += "\"t\":";    s += now() - ( (ee.tz + utime.getDST() ) * 3600);
   s += ",\"v\":\""; s += ut.ValueText(0);
   s += "\",\"u\":\""; s += ut.UnitText();
-  s += "\",\"v1\":\""; s += ut.ValueText(1);
-  s += "\",\"v2\":\""; s += ut.ValueText(2);
-  s += "\",\"v3\":\""; s += ut.ValueText(3);
+  s += "\",\"v1\":\"";
+  if(ut.m_MData.Recording)
+  {
+    s += timeFmt(ut.m_MData.u.RecTimer.dwElapsed);
+    s += "\",\"v2\":\""; s += timeFmt(ut.m_MData.u.RecTimer.dwRemain);
+    s += "\",\"v3\":\""; s += ut.m_MData.u.RecTimer.dwSamples;
+  }
+  else
+  {
+    if(ut.m_MData.Comp)
+      s += ut.m_MData.u.Comp.Fail ? "FAIL" : "PASS";
+    else
+      s += ut.ValueText(1);
+    s += "\",\"v2\":\""; s += ut.ValueText(2);
+    s += "\",\"v3\":\""; s += ut.ValueText(3);
+  }
   s += "\",\"mn\":"; s += nMin;
   s += ",\"mx\":"; s += nMax;
   s += ",\"md\":"; s += nMod;
@@ -176,20 +204,51 @@ String rangesJson()
     s += "\"]";
   }
   s += ']';
-  if(ut.m_MData.Rel || ut.m_MData.Peak || ut.m_MData.dataType == 1 || ut.m_MData.dataType == 3)
+
+  if(ut.m_MData.MinMax)
+  {
+    fixDeg(ut.m_MData.u.MM.szUnit);    
+    s += ",\"u1\":\""; s += ut.m_MData.u.MM.szUnit;
+    s += "\",\"u2\":\""; s += ut.m_MData.u.MM.szUnit;
+    s += "\",\"u3\":\""; s += ut.m_MData.u.MM.szUnit; s += "\"";
+  }
+  else if(ut.m_MData.Peak)
+  {
+    fixDeg(ut.m_MData.u.Ext.szUnit1);
+    s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
+    s += "\",\"u2\":\"";
+    s += "\",\"u3\":\"\"";
+  }
+  else if(ut.m_MData.Rel)
+  {
+    fixDeg(ut.m_MData.u.Ext.szUnit1);
+    fixDeg(ut.m_MData.u.Ext.szUnit2);
+    s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
+    s += "\",\"u2\":\""; s += ut.m_MData.u.Ext.szUnit2;
+    s += "\",\"u3\":\"\"";
+  }
+  else if(ut.m_MData.Switch==4&&ut.m_MData.Select==2)
+  {
+    fixDeg(ut.m_MData.u.Std.szUnit);
+    s += ",\"u1\":\""; s += ut.m_MData.u.Std.szUnit;
+    s += "\",\"u2\":\"";
+    if(ut.m_MData.tempReverse || ut.m_MData.tempSubReverse)
+      s += ut.m_MData.u.Std.szUnit;
+    s += "\",\"u3\":\"\"";
+  }
+  else if(ut.m_MData.dataType == 1)
   {
     fixDeg(ut.m_MData.u.Ext.szUnit1);
     fixDeg(ut.m_MData.u.Ext.szUnit2);
     fixDeg(ut.m_MData.u.Ext.szUnit3);
     s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
     s += "\",\"u2\":\""; s += ut.m_MData.u.Ext.szUnit2;
-    s += "\",\"u3\":\"\""; s += ut.m_MData.u.Ext.szUnit3; s += "\"";
+    s += "\",\"u3\":\""; s += ut.m_MData.u.Ext.szUnit3; s += "\"";
   }
   else
   {
-    fixDeg(ut.m_MData.u.Std.szUnit2);
-    s += ",\"u1\":\""; ut.m_MData.u.Std.szUnit2;
-    s += "\",\"u2\":\"\"";
+    s += ",\"u1\":\"\""; 
+    s += ",\"u2\":\"\"";
     s += ",\"u3\":\"\"";
   }
 
@@ -204,36 +263,47 @@ String rangesJson()
   {
       s += ",\"l0\":\"REC\""; 
       s += ",\"l1\":\"Elapsed Time:\"";
-      s += ",\"l2\":\"\"Remaining Time:\"";
-      s += ",\"l3\":\"\"Samples:\"";
+      s += ",\"l2\":\"Remaining Time:\"";
+      s += ",\"l3\":\"Samples:\"";
   }
   else if(ut.m_MData.Rel)
   {
       s += ",\"l0\":\"REL\""; 
       s += ",\"l1\":\"Reference:\"";
-      s += ",\"l2\":\"\"Measurement:\"";
+      s += ",\"l2\":\"Measurement:\"";
       s += ",\"l3\":\"\"";
   }
-  else if(ut.m_MData.dataType == 1) // Temp
+  else if(ut.m_MData.Switch==4 && ut.m_MData.Select==2) // Temp
   {
       s += ",\"l0\":\"\"";
-      if(ut.m_MData.tempReverse)
-        s += ",\"l1\":\"T1\"";
-      else
+      if(ut.m_MData.tempSubReverse)
+      {
         s += ",\"l1\":\"T2\"";
-      s += ",\"l2\":\"\"";
+        s += ",\"l2\":\"T1\"";
+      }
+      else if(ut.m_MData.tempReverse)
+      {
+        s += ",\"l1\":\"T1\"";
+        s += ",\"l2\":\"\"";
+      }
+      else
+      {
+        s += ",\"l1\":\"T2\"";
+        s += ",\"l2\":\"\"";
+      }
       s += ",\"l3\":\"\"";
   }
-  else if(ut.m_MData.dataType == 3) // Subtractive temp
+  else if(ut.m_MData.Comp)
   {
+      static char *compM[] = {"INNER", "OUTER", "< VALUE", "> VALUE"};
       s += ",\"l0\":\"\"";
-      s += ",\"l1\":\"T1\"";
-      s += ",\"l2\":\"T2\"";
-      s += ",\"l3\":\"\"";
+      s += ",\"l1\":\"MODE: "; s += compM[ut.m_MData.u.Comp.CompMode]; s+= "\"";
+      s += ",\"l2\":\"LOW:  "; s += ut.m_MData.u.Comp.fLow; s += "\"";
+      s += ",\"l3\":\"HIGH: "; s += ut.m_MData.u.Comp.fHigh; s += "\"";
   }
   else // normal
   {
-      s += ",\"l0\":\"\""; 
+      s += ",\"l0\":\"\"";
       s += ",\"l1\":\"\"";
       s += ",\"l2\":\"\"";
       s += ",\"l3\":\"\"";
@@ -245,8 +315,9 @@ String rangesJson()
 String settingsJson()
 {
   String s = "settings;{";
-  s += "\"tz\":";    s += ee.tz;
-  s += ",\"o\":";  s += ee.bEnableOLED;
+  s += "\"tz\":"; s += ee.tz;
+  s += ",\"o\":"; s += ee.bEnableOLED;
+  s += ",\"f\":"; s += ee.exportFormat;
   s += "}\n";
   return s;
 }
@@ -289,7 +360,7 @@ void parseParams(AsyncWebServerRequest *request)
 }
 
 const char *jsonList1[] = { "cmd",
-  "oled",
+  "oled", // 0
   "TZ",
   "hold",
   "mm", // minmax
@@ -298,12 +369,21 @@ const char *jsonList1[] = { "cmd",
   "rel",
   "rec",
   "svs",
+  "name", // 9
+  "int",
+  "sav",
+  "stop",
+  "file",
+  "snap", //14
+  "fmt",
   NULL
 };
 
 void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
 {
   uint8_t sel;
+  static char szName[16];
+  static uint32_t wInterval;
 
   switch(iEvent)
   {
@@ -341,6 +421,37 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
         case 8: // saves
           ut.getSaveCount();
           break;
+        case 9: // name
+          strncpy(szName, psValue, sizeof(szName)-1);
+          break;
+        case 10: // interval
+          wInterval = iValue;
+          break;
+        case 11: //save (duration)
+          if(iValue == 0)
+            ut.Save();
+          else
+          {
+            if(strlen(szName) == 0)
+              strcpy(szName, "Record_01");
+            if(wInterval == 0)
+              break;
+            ut.StartRecord(szName, wInterval, iValue);
+          }
+          break;
+        case 12: // stop
+          if(ut.m_MData.Recording)
+            ut.StopRecord();
+          break;
+        case 13: // file
+          ut.startRecordRetreval(iValue, szName, wInterval);
+          break;
+        case 14: // snap
+//        ut.getSave(iValue, true);
+          break;
+        case 15: // fmt
+          ee.exportFormat = iValue;
+          break;
       }
       break;
   }
@@ -348,10 +459,10 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
 
 void sendSaveEntry(SaveRec *pRec)
 {
-  String s = "save;{\"n\":\"";
+  String s = "save;{\"a\":[[\"";
 
   s += ut.convertDate(pRec->Date);
-  s += "\",\"a\":[[\"";
+  s += "\"],[\"";
   s += ut.ValueText(pRec->Value0);
   s += "\"],[\"";
 
@@ -402,9 +513,9 @@ void sendSaveEntry(SaveRec *pRec)
 
 void sendRecordEntry(Record *pRecord)
 {
-  String s = "record;{\"n\":\"";
+  String s = "record;{\"a\":[[\"";
   s += pRecord->szName;
-  s += "\",\"a\":[[\""; s += ut.convertDate(pRecord->Date);
+  s += "\"],[\""; s += ut.convertDate(pRecord->Date);
   fixDeg(pRecord->szUnit);
   s += "\"],[\""; s += pRecord->szUnit;
   s += "\"],[\""; s += pRecord->dwSamples;
@@ -417,7 +528,7 @@ void sendRecordEntry(Record *pRecord)
   ws.textAll(s);
 }
 
-void sendDbg(String s)
+void WsSend(String s)
 {
   ws.textAll(s);  
 }
@@ -437,7 +548,6 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       client->keepAlivePeriod(50);
       client->text(dataJson());
       client->text(settingsJson());
-      client->text(rangesJson());
       client->ping();
       oldSW = 20;
       break;
@@ -626,6 +736,7 @@ void loop()
   static uint8_t hour_save, sec_save;
   static uint8_t cnt;
   static uint32_t oldOpt;
+  time_t nw;
 
   MDNS.update();
 #ifdef OTA_ENABLE
@@ -633,7 +744,8 @@ void loop()
 #endif
   utime.check(ee.tz);
 
-  ut.service(); // read serial data
+  nw = now();
+  ut.service(nw); // read serial data
 
   if(ut.Updated())
     ws.textAll(dataJson());
@@ -646,12 +758,13 @@ void loop()
     ws.textAll(rangesJson());
   }
 
-  if(sec_save != second()) // only do stuff once per second (loop is maybe 20-30 Hz)
+  int s = second(nw);
+  if(sec_save != s) // only do stuff once per second (loop is maybe 20-30 Hz)
   {
-    sec_save = second();
-    if (hour_save != hour())
+    sec_save = s;
+    if(s == 0 && hour_save != hour(nw))
     {
-      hour_save = hour();
+      hour_save = hour(nw);
       if(hour_save == 2)
       {
         utime.start(); // update time daily at DST change
@@ -669,22 +782,10 @@ void loop()
 
     if(displayTimer) // temp display on thing
       displayTimer--;
-
-    static uint8_t pulseTime = 1;
-    if(--pulseTime == 0)
-    {
-      pulseTime = 5;
-//      digitalWrite(ESP_LED, LOW);
-  //    delay(10);
-    //  digitalWrite(ESP_LED, HIGH);
-    }
   }
 
-  if(wifi.isCfg()) // WiFi cfg will draw it
-    return;
-
   // draw the screen here
-  if(ee.bEnableOLED)
+  if(ee.bEnableOLED && wifi.isCfg() == false)
   {
     display.clear();
     display.drawPropString( 2, 23, ut.ValueText(0) );
