@@ -62,10 +62,8 @@ struct MValue
   uint8_t Precision:4;
 };
 
-struct ItemData{
-  MValue  Value[4];
-  float   fScale;
-  uint8_t tick;
+struct RecItem{
+  MValue  Value;
   uniDate t;
 };
 
@@ -191,7 +189,7 @@ struct MData
   uint8_t  Unk3:5; // byte 2
   uint8_t  tempReverse:1;
   uint8_t  Unk4:1;
-  uint8_t  TempSubReverse:1;
+  uint8_t  tempSubReverse:1;
   uint8_t  Select:4; // byte 3
   uint8_t  Switch:4; // byte 3
   uint8_t  Range:4;  // byte 4
@@ -200,21 +198,28 @@ struct MData
   UData    u;        // union based on dataType
 };
 
-#pragma pack(pop)
-
-struct ChartData
+struct recReq
 {
-  uint32_t dwAvail;
-  uint32_t dwIndex;
-  uint32_t dwCount;
-  ItemData *pData;
+  uint8_t Cmd;
+  uint16_t wItem;
+  uint32_t dwOffset;
 };
+
+struct recCmd
+{
+  uint8_t Cmd;
+  char szName[11];
+  uint16_t wInterval;
+  uint32_t dwDuration;
+};
+
+#pragma pack(pop)
 
 class UT181Interface
 {
 public:
   UT181Interface(){};
-  void service(void);
+  void service(time_t nw);
   void Connect(bool bCon);
   bool Updated(void);
   bool WriteData(uint8_t *pData, int len);
@@ -233,9 +238,14 @@ public:
   uint16_t StatusBits(void);
   void getRecordCount(void);
   void getSaveCount(void);
+  void DeleteAllSave(void);
+  void Save(void);
+  void StartRecord(char *pName, uint16_t wInterval, uint32_t dwDuration);
+  void StopRecord(void);
+  void startRecordRetreval(int nItem, char *pszUnit, uint32_t dwSamples);
+
 private:
   uint16_t getWord(uint8_t *p);
-  float GetValueScale(char *pszUnit);
   uint16_t sum(uint8_t *p, uint16_t len);
   bool Write(uint8_t *p, uint8_t len);
   void process_sentence(uint16_t len);
@@ -243,12 +253,9 @@ private:
   void getRecord(uint16_t nItem);
   void decodeSamples(uint8_t *p, uint8_t count);
   void getRecordData(void);
-  void startRecordRetreval(int nItem);
-  void Save(void);
   void getSave(uint16_t nItem);
-  void DeleteAllSave(void);
 
-  uint8_t  m_buffer[3200]; // 3200 required for records
+  uint8_t  m_buffer[2800]; // 2800 required for records (2254)
   uint8_t  m_idx;
   uint8_t  m_state;
   uint16_t m_len;
@@ -256,16 +263,15 @@ private:
 
   uint16_t  m_nSaves;
   uint16_t  m_nRecords;
-  ChartData m_cData;
   uint8_t   m_nRecReq;
   int    m_nRecIdx;
   bool   m_bGetRecStart;
   int    m_nRecordItem;
   int    m_nRecDataIndexEnd;
   int    m_nRecDataIndex;
-  int    m_nRecordSampleItem;
   bool   m_bSign;
   uint32_t m_keepAlive;
+  char   m_szRecUnit[12];
 public:
   MData   m_MData;
   bool    m_bConnected;
