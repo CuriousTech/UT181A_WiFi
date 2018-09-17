@@ -4,15 +4,14 @@
 extern void sendBinData(uint8_t *p, int len);
 extern void sendSaveEntry(SaveRec *pRec);
 extern void sendRecordEntry(Record *pRecord);
-extern void sendDbg(String s);
+extern void WsSend(String s);
 
-void UT181Interface::service()
+void UT181Interface::service(time_t nw)
 {
-  while(Serial.available())
+  for(int n = Serial.available(); n; n--)
   {
     uint8_t c = Serial.read();
-    m_keepAlive = now();
-
+    m_keepAlive = nw;
     switch(m_state)
     {
       case 0:
@@ -38,22 +37,34 @@ void UT181Interface::service()
         {
           if( sum(m_buffer, m_len-2) == (m_buffer[m_len-2] | (m_buffer[m_len-1]<<8)) )
             process_sentence(m_len-2);
-
           else
           {
+            WsSend("print;chk error");
             digitalWrite(2, LOW);
             delay(5);
             digitalWrite(2, HIGH);
           }
           m_state = 0;
+          m_idx = 0;
+          m_len = 0;
         }
         break;
     }
   }
-  if( (now() - m_keepAlive) > 4)
+  if((nw - m_keepAlive) > 3)
   {
-    m_keepAlive = now();
+    m_keepAlive = nw;
     m_bConnected = false;
+    String s = "print; timeout ";
+    s += m_idx;
+    s += " ";
+    s += m_len;
+    WsSend(s);
+    m_state = 0;
+    m_idx = 0;
+    m_len = 0;
+    m_nRecReq = 0;
+    m_nRecordItem = 0;
   }
 }
 
@@ -76,7 +87,6 @@ void UT181Interface::process_sentence(uint16_t len)
           // 01 4F 4B A0 = 'OK '
           // 01 45 52 9D = 'ER'
           // 01 49 4E 56 = 'INV'
-      m_bConnected = true;
       if(m_nRecReq)
       {
         GetRecordSeq();
@@ -119,7 +129,9 @@ void UT181Interface::process_sentence(uint16_t len)
       sendRecordEntry( (Record*)(m_buffer + 1));
 
       if(++m_nRecIdx < m_nRecords)
+      {
         GetRecordSeq();
+      }
       else // end, reconnect
       {
         m_nRecReq = 0;
@@ -130,9 +142,15 @@ void UT181Interface::process_sentence(uint16_t len)
       decodeSamples(m_buffer + 2, m_buffer[1]);
       m_nRecDataIndex += m_buffer[1];
       if(m_nRecDataIndex < m_nRecDataIndexEnd)
+      {
         getRecordData();
+      }
       else // end of record, restart
+      {
+        m_nRecordItem = 0;
         Connect(true);
+        WsSend("finish;0");
+      }
       break;
     case 0x72:  // number of saves/records
       switch(m_buffer[1])
@@ -160,24 +178,25 @@ uint16_t UT181Interface::getWord(uint8_t *p)
   return *wP;
 }
 
-void UT181Interface::startRecordRetreval(int nItem)
+void UT181Interface::startRecordRetreval(int nItem, char *pszUnit, uint32_t dwSamples)
 {
   if(nItem >= m_nRecords)
     return;
 
-//  AllocChart(m_pRecords[nItem].dwSamples);
+  strcpy(m_szRecUnit, pszUnit);
   m_nRecDataIndex = 0;
-//  m_nRecDataIndexEnd = m_pRecords[nItem].dwSamples;
-  m_nRecordItem = nItem + 1;
+  m_nRecDataIndexEnd = dwSamples;
   m_bGetRecStart = true;
-  m_nRecordSampleItem = nItem;
   Connect(false);
+  m_nRecordItem = nItem + 1;
 }
 
 void UT181Interface::Connect(bool bCon)
 {
   static uint8_t cmd[]= {0x05,0x00};
 
+  if( m_nRecReq || m_nRecordItem) // in download mode
+    return;
   if(!bCon)  m_bConnected = false;
 
   cmd[1] = bCon ? 1 : 0;
@@ -274,15 +293,7 @@ void UT181Interface::Hold()
 void UT181Interface::MinMax() // toggle
 {
   static uint8_t cmd[]= {0x04,0x00};
-  bool bOn = false;
-  switch(m_MData.dataType)
-  {
-    case 0x2F: // Max min
-    case 0x27: // max min temp
-      bOn = true;
-      break;
-  }
-  cmd[1] = bOn ? 0:1;
+  cmd[1] = m_MData.MinMax ? 0:1;
   Write(cmd, sizeof(cmd) );
 }
 
@@ -292,13 +303,19 @@ void UT181Interface::GetRecordSeq()
   {
     case 1:
       if(m_nRecIdx > m_nSaves)
+      {
+        m_nRecReq = 0;
         Connect(true);
+      }
       else
         getSave(m_nRecIdx+1);
       break;
     case 2:
       if(m_nRecIdx > m_nRecords)
+      {
+        m_nRecReq = 0;
         Connect(true);
+      }
       else
         getRecord(m_nRecIdx+1);
       break;
@@ -323,60 +340,24 @@ void UT181Interface::getRecordCount()
 
 void UT181Interface::decodeSamples(uint8_t *p, uint8_t count)
 {
-/*
-  float fScale = GetValueScale(m_pRecords[m_nRecordSampleItem].szUnit);
-  int n = m_nRecDataIndex;
-  int tick = 0;
-  uint8_t lastSec = 0;
+  String s;
 
+  s = "chunk;";
   for(int i = 0; i < count; i++)
   {
-    MValue *pM = (MValue*)p;
-    memcpy(&m_cData.pData[m_cData.dwIndex].Value[0], pM, sizeof(MValue) );
-    m_cData.pData[m_cData.dwIndex].fScale = fScale;
-    p += 5;
-
-    m_cData.pData[m_cData.dwIndex].t.dw = *(uint32_t*)p;
-    if(m_cData.pData[m_cData.dwIndex].t.seconds != lastSec || tick > 9)
-    {
-      lastSec = m_cData.pData[m_cData.dwIndex].t.seconds;
-      tick = 0;
-    }
-    m_cData.pData[m_cData.dwIndex].tick = tick++;
-    p += 4;
-    if(m_cData.dwCount < m_pRecords[m_nRecordSampleItem].dwSamples)
-    {
-      m_cData.dwIndex++;
-      m_cData.dwCount++;
-    }
+    RecItem item;
+    memcpy(&item, p, sizeof(RecItem));
+    s += ValueText(item.Value);
+    s += ",";
+    s += convertDate(item.t);
+    s += "\r\n";
+    p += sizeof(RecItem);
   }
-  */
-}
-
-float UT181Interface::GetValueScale(char *pszUnit)
-{
-  switch(pszUnit[0])
-  {
-    case 'k': return 1000;
-    case 'M': return 1000000;
-    case 'm': return 0.001f;
-    case 'u': return 0.000001f;
-    case 'n': return 0.000000001f;
-    default: return 1;
-  }
+  WsSend(s);
 }
 
 void UT181Interface::getRecordData()
 {
-  #pragma pack(push, 1)
-  struct recReq
-  {
-    uint8_t Cmd;
-    uint16_t wItem;
-    uint32_t dwOffset;
-  };
-  #pragma pack(pop)
-
   recReq rr;
 
   rr.Cmd = 0x0D;
@@ -388,6 +369,24 @@ void UT181Interface::getRecordData()
 void UT181Interface::Save()
 {
   static uint8_t cmd[]= {0x06};
+
+  Write(cmd, sizeof(cmd) );
+}
+
+void UT181Interface::StartRecord(char *pName, uint16_t wInterval, uint32_t dwDuration)
+{
+  recCmd rc;
+
+  rc.Cmd = 0x0A;
+  strcpy(rc.szName, pName);
+  rc.wInterval = wInterval;
+  rc.dwDuration = dwDuration;
+  Write((uint8_t*)&rc, sizeof(rc) );
+}
+
+void UT181Interface::StopRecord()
+{
+  uint8_t cmd[]= {0x0B};
 
   Write(cmd, sizeof(cmd) );
 }
@@ -425,7 +424,7 @@ const char *UT181Interface::convertDate(uniDate &dt)
   if(dt.day<10) s += "0";
   s += dt.day;
   s += " ";
-  if(dt.hours<10) s += " ";
+  if(dt.hours<10) s += "  ";
   s += dt.hours;
   s += ":";
   if(dt.minutes<10) s += "0";
@@ -522,7 +521,7 @@ void UT181Interface::RangeMod(int &nMin, int &nMax, int &nMod)
 {
   getSign();
 
-  if(m_MData.Peak)
+  if(m_MData.Peak || m_MData.MinMax)
   {
     nMin = nMax = nMod = 0;
     return;
