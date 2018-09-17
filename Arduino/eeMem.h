@@ -12,6 +12,7 @@ struct eeSet // EEPROM backed data
   int8_t   tz;            // Timezone offset
   uint8_t  dst;
   bool     bEnableOLED;
+  uint8_t  exportFormat;
   uint16_t rate;
 };
 
