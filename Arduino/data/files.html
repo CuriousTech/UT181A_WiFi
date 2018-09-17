@@ -31,14 +31,14 @@ ws=new WebSocket("ws://"+window.location.host+"/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
- console.log(evt.data)
+// console.log(evt.data)
  lines = evt.data.split(';')
  event=lines[0]
  data=lines[1]
  
  if(event == 'settings')
  {
-	getFiles('svs',0);
+	getFiles('rec',0);
  }
  else if(event == 'state')
  {
@@ -53,33 +53,67 @@ ws.onmessage=function(evt){
  else if(event == 'record')
  {
   d=JSON.parse(data)
-  AddFile(1,d.n,d.a)
+  listArr.push(d.a)
+  AddFile(1,d.a)
  }
  else if(event == 'save')
  {
   d=JSON.parse(data)
-  AddFile(1,d.n,d.a)
+  listArr.push(d.a)
+  AddFile(0,d.a)
+ }
+ else if(event == 'print')
+ {	console.log(data)
+ }else if(event == 'chunk')
+ {
+  fileData.push(data)
+ }
+ else if(event == 'finish')
+ {
+	var file;
+	var properties={type: 'text/plain'}
+	try {
+	  file=new File(fileData,fileName,properties)
+	}catch(e){
+	  file=new Blob(fileData,properties)
+	}
+	l=document.createElement("a")
+	l.href=URL.createObjectURL(file)
+	l.download=fileName
+	document.body.appendChild(l)
+	l.click()
+	setTimeout(function(){
+		document.body.removeChild(l)
+		window.URL.revokeObjectURL(l.href)
+		},0)
  }
 }
 }
-
-function load(idx)
+function dload(idx)
 {
-  console.log('load ' + idx)
+  fileData=[]
+  fileName=listArr[idx][0]+'.txt'
+  ws.send('cmd;{"name":"'+listArr[idx][2]+'","int":"'+listArr[idx][3]+'","file":'+idx+'}')
 }
-
-function AddFile(type,name,arr)
+function getsnap(idx)
+{
+  ws.send('cmd;{"snap":'+idx+'}')
+}
+function AddFile(type,arr)
 {
   tr=document.createElement("tr")
   td=document.createElement("td")
   inp=document.createElement("input")
-  inp.value=name
-  inp.id=type+(idx<<1)
+  inp.value=arr[0]
+  inp.id=idx
   inp.type='button'
-  inp.onclick=function(){load(this.id)}
+  if(type)
+	inp.onclick=function(){dload(this.id)}
+  else
+	inp.onclick=function(){getsnap(this.id)}
   td.appendChild(inp)
   tr.appendChild(td)
-  for(i=0;i<arr.length;i++){
+  for(i=1;i<arr.length;i++){
 	td=document.createElement("td")
 	td.appendChild(document.createTextNode(fixLabel(arr[i])))
 	tr.appendChild(td)
@@ -92,18 +126,17 @@ function AddFile(type,name,arr)
 
 function fixLabel(s)
 {
-  s=String(s).replace(/~/g, '\u03A9')
-  return s.replace(/@/g, '\xB0')
+  s=String(s).replace(/~/g, '\\u03A9')
+  return s.replace(/@/g, '\\xB0')
 }
 
 function getFiles(varName)
 {
  list=document.getElementById("list")
  while(list.firstChild)
- {
 	 list.removeChild(list.firstChild)
- }
  idx=0
+ listArr=new Array()
  ws.send('cmd;{"'+varName+'":0}')
 }
 </script>
@@ -115,7 +148,7 @@ function getFiles(varName)
 <tr><td><input type="button" value="Saves" onClick="{getFiles('svs')}"></td><td><input type="button" value="Records" onClick="{getFiles('rec')}"></td></tr>
 </table>
 &nbsp
-<table style="font-size:x-small" id="list">
+<table style="font-size:x-small" id="list" width="440">
 </table>
 </div>
 </body>

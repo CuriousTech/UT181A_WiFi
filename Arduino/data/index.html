@@ -14,7 +14,7 @@ background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);
 background-image: linear-gradient(top, #ffffff, #50a0ff);
 background-clip: padding-box;
 }
-body{width:340px;font-family: Arial, Helvetica, sans-serif;}
+body{width:340px;font-family: Arial, Helvetica, sans-serif; overflow:hidden;}
 .range{
   overflow: hidden;
 }
@@ -49,20 +49,28 @@ body{width:340px;font-family: Arial, Helvetica, sans-serif;}
 .dropdown:hover .dropdown-content {display: block;}
 .dropdown:hover .dropbtn {background-color: #3e8e41;}
 .dropdown:hover .btn {	background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);}
+#rec{
+opacity:.9;
+display:none;
+position:absolute;
+background-color:#A13131;
+overflow:auto;
+z-index:1;
+}
 </style>
 <script type="text/javascript">
 a=document.all
 oledon=0;v=0;min=-60;max=60;mod=5;st=1073676544;lastst=0
 va=new Array()
 function startWS(){
-draw_bar()
+draw_bar(0)
 draw_chart()
-//ws=new WebSocket("ws://"+window.location.host+"/ws")
-ws=new WebSocket("ws://192.168.0.109/ws")
+ws=new WebSocket("ws://"+window.location.host+"/ws")
+//ws=new WebSocket("ws://192.168.0.109/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
- console.log(evt.data)
+// console.log(evt.data)
  lines = evt.data.split(';')
  event=lines[0]
  data=lines[1]
@@ -78,10 +86,10 @@ ws.onmessage=function(evt){
 	dt=new Date(d.t*1000)
 	a.time.innerHTML=dt.toLocaleTimeString()
 	a.value.innerHTML=d.v
-	unit=d.u.replace(/~/g, '&#937;')
-	unit=unit.replace(/@/g, '&#176;')
-	a.unit.innerHTML=unit
+	a.unit.innerHTML=fixLabel(d.u)
 	a.v1.innerHTML=d.v1
+	if(d.st&(1<<6))
+	  	a.v1.setAttribute('style',d.v1=='FAIL'?'color:red':'color:green')
 	a.v2.innerHTML=d.v2
 	a.v3.innerHTML=d.v3
 	v=+d.v
@@ -92,7 +100,7 @@ ws.onmessage=function(evt){
 	st=+d.st
 	if(max){
 		a.bar.setAttribute('style','')
-		draw_bar()
+		draw_bar(d.v=='0L'?1:0)
 	}else a.bar.setAttribute('style','display:none')
 	draw_chart()
 
@@ -102,12 +110,18 @@ ws.onmessage=function(evt){
 		if(st&(1<<2)) document.getElementById('imag').src = 'diode.png'
 		else if(st&(1<<1)) document.getElementById('imag').src = 'beep.png'
 		else document.getElementById('imag').src = ''
+		a.record.value=(st&(1<<8))?"Stop":"Record"
+		recording=(st&(1<<8))?true:false
 		lastst=st
 	}
 	if(st&(1<<11)){ //MM
 		a.t1.innerHTML=v2t(+d.t1)
 		a.t2.innerHTML=v2t(+d.t2)
 		a.t3.innerHTML=v2t(+d.t3)
+	}
+	else if(st&(1<<7)){ //Peak
+		a.pm.innerHTML="PeakMax"
+		a.t1.innerHTML="PeakMin"
 	}
  }
  else if(event == 'alert')
@@ -130,17 +144,24 @@ ws.onmessage=function(evt){
    item.innerHTML=d.o[i]
   }
   a.mm.innerHTML=d.l0
-  a.u1.innerHTML=d.u1.replace(/@/g, '&#176;')
-  a.u2.innerHTML=d.u2.replace(/@/g, '&#176;')
-  a.u3.innerHTML=d.u3
+  a.u1.innerHTML=fixLabel(d.u1)
+  a.u2.innerHTML=fixLabel(d.u2)
+  a.u3.innerHTML=fixLabel(d.u3)
   a.l1.innerHTML=d.l1
   a.l2.innerHTML=d.l2
   a.l3.innerHTML=d.l3
   a.t1.innerHTML=''
   a.t2.innerHTML=''
   a.t3.innerHTML=''
+  a.pm.innerHTML=''
  }
 }
+}
+
+function fixLabel(s)
+{
+  s=String(s).replace(/~/g, '\\u03A9')
+  return s.replace(/@/g, '\\xB0')
 }
 
 function v2t(v)
@@ -172,7 +193,7 @@ setVar('oled', oledon)
 a.OLED.value=oledon?'ON ':'OFF'
 }
 
-function draw_bar(){
+function draw_bar(zl){
 try {
 	var c2 = document.getElementById('bar')
 	ctx = c2.getContext("2d")
@@ -279,6 +300,24 @@ try {
 	ctx.stroke()
 }catch(err){}
 }
+
+function openRec()
+{
+ if(recording)
+	setVar('stop',0)
+ else
+	document.getElementById('rec').style.display="inline-block";
+}
+function startRec()
+{
+ document.getElementById('rec').style.display="none";
+ ws.send('cmd;{"name":"'+a.name.value+'","interval":"'+a.interval.value+'","sav":"'+a.duration.value+'"}')
+}
+function cancelRec()
+{
+ document.getElementById('rec').style.display="none";
+}
+
 </script>
 <body bgcolor="black" text="silver"  onload="{startWS()}">
 <div><h3 align="center">WiFi UT181A</h3>
@@ -289,12 +328,22 @@ try {
 </table>
 <table align=center width=320>
 <tr align=center><td width=150 align="right" colspan=2><div id="value" style="font-size:xx-large">0L</div></td><td><div id="unit">DCV</div></td>
-<td><img id="imag" src='' style="width:38px"></td></tr>
+<td><div id="pm"></div><img id="imag" src='' style="width:38px"></td></tr>
 <tr><td colspan=4><canvas id="bar" width="300" height="40" style="float:center"></td></tr>
 <tr><td><div id="l1"></div></td><td><div id="v1"></div></td><td><div id="u1"></div></td><td align="right"><div id="t1"></div></td></tr>
 <tr><td><div id="l2"></div></td><td><div id="v2"></div></td><td><div id="u2"></div></td><td align="right"><div id="t2"></div></td></tr>
 <tr><td><div id="l3"></div></td><td><div id="v3"></div></td><td><div id="u3"></div></td><td align="right"><div id="t3"></div></td></tr>
 <tr><td colspan=4><input type="button" value="Hold" id="hold" onClick="{setVar('hold', 0)}">
+<div id="rec"><div id="popupRec">
+<h2>Record</h2>
+<table width="100">
+<tr><td>Name: <input id="name" name="name" placeholder="REC_1" type="text" size="10"></td></tr>
+<tr><td>Interval:<input id="interval" name="interval" placeholder="1" type="text" size="10"></td></tr>
+<tr><td>Duration:<input id="duration" name="duration" placeholder="60" type="text" size="10"></td></tr>
+<tr><td><input type="button" id="close" value="Cancel" onclick ="cancelRec()"><input type="button" id="start" value="Start" onclick ="startRec()"></td></tr>
+</table>
+</div>
+</div>
 <div class="dropdown">
   <button class="dropbtn">Range</button>
   <div class="dropdown-content">
@@ -325,7 +374,9 @@ try {
 <tr><td colspan=4></td></tr>
 <tr><td colspan=4><canvas id="chart" width="300" height="300" style="float:center"></td></tr>
 <tr><td colspan=4>&nbsp </td></tr>
-<tr><td>OLED: <input type="button" value="ON" id="OLED" onClick="{oled()}"></td><td><input type="submit" value="Files" onClick="window.location='/files.html';"></td><td><input type="submit" value="Setup" onClick="window.location='/s';"></td><td></td></tr>
+<tr><td>OLED:<input type="button" value="ON" id="OLED" onClick="{oled()}"></td><td>
+<input type="button" value="Save" onClick="{setVar('sav', 0)}"> <input type="button" id="record" value="Record" onClick="{openRec()}">
+</td><td><input type="submit" value="Files" onClick="window.location='/files.html';"></td><td><input type="submit" value="Setup" onClick="window.location='/s';"></td></tr>
 </table>
 &nbsp
 </div>
