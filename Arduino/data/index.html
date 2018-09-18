@@ -89,11 +89,12 @@ ws.onmessage=function(evt){
 	a.unit.innerHTML=fixLabel(d.u)
 	a.v1.innerHTML=d.v1
 	if(d.st&(1<<6))
-	  	a.v1.setAttribute('style',d.v1=='FAIL'?'color:red':'color:green')
+		a.v1.setAttribute('style',d.v1=='FAIL'?'color:red':'color:green')
 	a.v2.innerHTML=d.v2
 	a.v3.innerHTML=d.v3
 	v=+d.v
-	va.push(v)
+	aa=[v,dt]
+	va.push(aa)
 	min=+d.mn
 	max=+d.mx
 	mod=+d.md
@@ -161,7 +162,7 @@ ws.onmessage=function(evt){
 function fixLabel(s)
 {
   s=String(s).replace(/~/g, '\\u03A9')
-  return s.replace(/@/g, '\\xB0')
+  return s.replace(/@/g, '\xB0')
 }
 
 function v2t(v)
@@ -258,28 +259,15 @@ try {
 function draw_chart(){
 try {
 	var c=document.getElementById('chart')
-	ctx = c.getContext("2d")
+	ctx=c.getContext("2d")
 	if(va.length>c.width-19) va.shift()
-	ctx.fillStyle = "#222"
+	ctx.fillStyle="#222"
 	ctx.fillRect(0,0,c.width,c.height)
-	ctx.fillStyle = "#FFF"
-	ctx.lineWidth = 1
-	ctx.font = "bold 10px sans-serif"
+	ctx.fillStyle="#FFF"
+	ctx.lineWidth=1
+	ctx.font="bold 10px sans-serif"
 	ctx.textAlign="right"
 	h=c.height-20
-	fVal = min
-	for(i=6;i>=0;i--)
-	{
-		y=i/6*h+12
-		ctx.strokeStyle = "#FFF"
-		ctx.fillText(fVal, 20, y+3)
-		fVal+=(max-min)/6
-		ctx.strokeStyle = "#555"
-		ctx.beginPath()
-	    ctx.moveTo(21, y)
-	    ctx.lineTo(c.width, y)
-		ctx.stroke()
-	}
 	if(min<0){
 		base=h/2
 		range=h/2
@@ -287,14 +275,43 @@ try {
 		base=h
 		range=h
 	}
-	ciel=max
-	y=base-(va[0]/ciel*range)
-	ctx.strokeStyle = "#FFF"
-	ctx.beginPath()
-    ctx.moveTo(20, y);
+	base+=10
+	fVal=min
+	for(i=6;i>=0;i--)
+	{
+		y=(i/6*h)+10
+		ctx.strokeStyle="#FFF"
+		ctx.fillText(fVal,20,y+3)
+		fVal+=(max-min)/6
+		ctx.strokeStyle="#555"
+		ctx.beginPath()
+	    ctx.moveTo(21,y)
+	    ctx.lineTo(c.width,y)
+		ctx.stroke()
+	}
+
+	ctx.strokeStyle = "#555"
+	m=0
 	for(i=1,x=21;i<va.length;i++,x++)
 	{
-		y=base-(va[i]/ciel*range)
+		if(va[i][1].getSeconds()==0&&va[i][1].getMinutes()!=m)
+		{
+			ctx.beginPath()
+		    ctx.moveTo(x,h+10)
+		    ctx.lineTo(x,10)
+			ctx.stroke()
+			m=va[i][1].getMinutes()
+		}
+	}
+
+	ciel=max
+	y=base-(va[0][0]/ciel*range)
+	ctx.strokeStyle = "#FFF"
+	ctx.beginPath()
+    ctx.moveTo(20, y)
+	for(i=1,x=21;i<va.length;i++,x++)
+	{
+		y=base-(va[i][0]/ciel*range)
 	    ctx.lineTo(x, y)
 	}
 	ctx.stroke()

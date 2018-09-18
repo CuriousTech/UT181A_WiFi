@@ -45,6 +45,7 @@ ws.onmessage=function(evt){
 	d=JSON.parse(data)
 	dt=new Date(d.t*1000)
 	a.time.innerHTML=dt.toLocaleTimeString()
+	a.status.innerHTML=d.v+' '+fixLabel(d.u);
  }
  else if(event == 'alert')
  {
@@ -63,13 +64,17 @@ ws.onmessage=function(evt){
   AddFile(0,d.a)
  }
  else if(event == 'print')
- {	console.log(data)
+ {
+	a.status.innerHTML=data;
+ 	console.log(data)
  }else if(event == 'chunk')
  {
   fileData.push(data)
+  a.status.innerHTML="Downloading "+fileData.length
  }
  else if(event == 'finish')
  {
+	a.status.innerHTML="Done";
 	var file;
 	var properties={type: 'text/plain'}
 	try {
@@ -127,7 +132,7 @@ function AddFile(type,arr)
 function fixLabel(s)
 {
   s=String(s).replace(/~/g, '\\u03A9')
-  return s.replace(/@/g, '\\xB0')
+  return s.replace(/@/g, '\xB0')
 }
 
 function getFiles(varName)
@@ -143,9 +148,11 @@ function getFiles(varName)
 <body bgcolor="black" text="silver"  onload="{startWS()}">
 <div><h3 align="center">UT181A Files</h3>
 
-<table align=center width=320 id="top">
-<tr align=center><td colspan=2><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td width=70></td><td></td></tr>
-<tr><td><input type="button" value="Saves" onClick="{getFiles('svs')}"></td><td><input type="button" value="Records" onClick="{getFiles('rec')}"></td></tr>
+<table align=center width=440>
+<tr align=center><td><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td></td><td></td></tr>
+<tr><td><input type="button" value="Saves" onClick="{getFiles('svs')}"></td>
+<td><input type="button" value="Records" onClick="{getFiles('rec')}"></td>
+<td><div id="status"></div></td></tr>
 </table>
 &nbsp
 <table style="font-size:x-small" id="list" width="440">
