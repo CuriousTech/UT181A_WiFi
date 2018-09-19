@@ -244,7 +244,8 @@ public:
   void StopRecord(void);
   void startRecordRetreval(int nItem, char *pszUnit, uint32_t dwSamples);
   int readPercent(void);
-
+  void deleteSave(int nItem);
+  void deleteRecord(int nItem);
 private:
   uint16_t getWord(uint8_t *p);
   uint16_t sum(uint8_t *p, uint16_t len);
@@ -257,7 +258,7 @@ private:
   void getSave(uint16_t nItem);
   time_t uniDateToGTC(uniDate &dt);
 
-  uint8_t  m_buffer[3200]; // 2800 required for records (2254)
+  uint8_t  m_buffer[3200]; // 2254 required for records
   uint16_t m_idx;
   uint8_t  m_state;
   uint16_t m_len;
