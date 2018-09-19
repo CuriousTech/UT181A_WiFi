@@ -8,7 +8,7 @@ extern void WsSend(String s);
 
 void UT181Interface::service(time_t nw)
 {
-  for(int n = Serial.available(); n; n--)
+  while(Serial.available())
   {
     uint8_t c = Serial.read();
     m_keepAlive = nw;
@@ -39,7 +39,15 @@ void UT181Interface::service(time_t nw)
             process_sentence(m_len-2);
           else
           {
-            WsSend("print;chk error");
+            String s;
+
+            s += "print;chk error ";
+            s += String(sum(m_buffer, m_len-2), HEX);
+            s += " ";
+            s += String(m_buffer[m_len-2], HEX);
+            s += String(m_buffer[m_len-1], HEX);
+
+            WsSend(s);
             digitalWrite(2, LOW);
             delay(5);
             digitalWrite(2, HIGH);
@@ -341,6 +349,7 @@ void UT181Interface::getRecordCount()
 void UT181Interface::decodeSamples(uint8_t *p, uint8_t count)
 {
   String s;
+  s.reserve(4800);
 
   s = "chunk;";
   for(int i = 0; i < count; i++)
@@ -349,7 +358,7 @@ void UT181Interface::decodeSamples(uint8_t *p, uint8_t count)
     memcpy(&item, p, sizeof(RecItem));
     s += ValueText(item.Value);
     s += ",";
-    s += convertDate(item.t);
+    s += uniDateToGTC(item.t);
     s += "\r\n";
     p += sizeof(RecItem);
   }
@@ -414,7 +423,7 @@ void UT181Interface::DeleteAllSave() // Saves
   Write(cmd, sizeof(cmd) );
 }
 
-const char *UT181Interface::convertDate(uniDate &dt)
+String UT181Interface::convertDate(uniDate &dt)
 {
   static String s;
   s = String(dt.year + 2000) + "/";
@@ -432,7 +441,26 @@ const char *UT181Interface::convertDate(uniDate &dt)
   s += ":";
   if(dt.seconds<10) s += "0";
   s += dt.seconds;
-  return s.c_str();
+  return s;
+}
+
+time_t UT181Interface::uniDateToGTC(uniDate &dt)
+{
+  tmElements_t t;
+
+  t.Year = dt.year;
+  t.Month = dt.month;
+  t.Day = dt.day;
+  t.Hour = dt.hours;
+  t.Minute = dt.minutes;
+  t.Second = dt.seconds;
+
+  return makeTime(t);
+}
+
+int UT181Interface::readPercent()
+{
+  return  m_nRecDataIndex * 100 / m_nRecDataIndexEnd;
 }
 
 int UT181Interface::DisplayCnt()
