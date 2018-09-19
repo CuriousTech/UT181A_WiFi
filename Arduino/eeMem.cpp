@@ -7,7 +7,7 @@ eeSet ee = { sizeof(eeSet), 0xAAAA,
   -5, 0,    // TZ, dst
   false,    // OLED
   0,        // exportFormat
-  55,     // rate
+  0,     // rate
 };
 
 eeMem::eeMem()
