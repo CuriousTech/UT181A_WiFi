@@ -14,7 +14,7 @@ void UT181Interface::service(time_t nw)
     m_keepAlive = nw;
     switch(m_state)
     {
-      case 0:
+      case 0:     // data packet: AB CD len len ............. chk chk
         if(c == 0xAB)
           m_state = 1;
         break;
@@ -48,7 +48,7 @@ void UT181Interface::service(time_t nw)
             s += String(m_buffer[m_len-1], HEX);
 
             WsSend(s);
-            digitalWrite(2, LOW);
+            digitalWrite(2, LOW); // strobe LED
             delay(5);
             digitalWrite(2, HIGH);
           }
@@ -59,7 +59,7 @@ void UT181Interface::service(time_t nw)
         break;
     }
   }
-  if((nw - m_keepAlive) > 3)
+  if((nw - m_keepAlive) > 3) // timeout should cause a restart if stopped
   {
     m_keepAlive = nw;
     m_bConnected = false;
@@ -76,7 +76,7 @@ void UT181Interface::service(time_t nw)
   }
 }
 
-bool UT181Interface::Updated()
+bool UT181Interface::Updated() // check for new primary data packet update
 {
   bool u = false;
   static int n;
@@ -95,11 +95,11 @@ void UT181Interface::process_sentence(uint16_t len)
           // 01 4F 4B A0 = 'OK '
           // 01 45 52 9D = 'ER'
           // 01 49 4E 56 = 'INV'
-      if(m_nRecReq)
+      if(m_nRecReq) // serialized start of file list retrieval
       {
         GetRecordSeq();
       }
-      if(m_bGetRecStart)
+      if(m_bGetRecStart)  // serialized start of large data retrieval
       {
         m_bGetRecStart = false;
         getRecordData();
@@ -113,14 +113,14 @@ void UT181Interface::process_sentence(uint16_t len)
     case 0x03: // save entry
       if(m_nRecIdx >= m_nSaves)
       {
-        m_nRecReq = 0;
+        m_nRecReq = 0; // too many
         break;
       }
       sendSaveEntry( (SaveRec*)(m_buffer + 1));
 
       if(++m_nRecIdx < m_nSaves)
         GetRecordSeq(); // get more
-      else
+      else // finished
       {
         m_nRecReq = 0;
         Connect(true);
@@ -147,7 +147,7 @@ void UT181Interface::process_sentence(uint16_t len)
       }
       break;
     case 0x05: // record data
-      decodeSamples(m_buffer + 2, m_buffer[1]);
+      decodeSamples(m_buffer + 2, m_buffer[1]); // first byte is count
       m_nRecDataIndex += m_buffer[1];
       if(m_nRecDataIndex < m_nRecDataIndexEnd)
       {
@@ -199,7 +199,7 @@ void UT181Interface::startRecordRetreval(int nItem, char *pszUnit, uint32_t dwSa
   m_nRecordItem = nItem + 1;
 }
 
-void UT181Interface::Connect(bool bCon)
+void UT181Interface::Connect(bool bCon) // start/stop meter data transmit
 {
   static uint8_t cmd[]= {0x05,0x00};
 
@@ -305,7 +305,7 @@ void UT181Interface::MinMax() // toggle
   Write(cmd, sizeof(cmd) );
 }
 
-void UT181Interface::GetRecordSeq()
+void UT181Interface::GetRecordSeq() // get next record or save (redundant?)
 {
   switch(m_nRecReq)
   {
@@ -330,7 +330,7 @@ void UT181Interface::GetRecordSeq()
   }
 }
 
-void UT181Interface::getRecord(uint16_t nItem)
+void UT181Interface::getRecord(uint16_t nItem) // get a record entry
 {
   uint8_t cmd[]= {0x0C, 0, 0};
 
@@ -346,7 +346,7 @@ void UT181Interface::getRecordCount()
   Write(cmd, sizeof(cmd) );
 }
 
-void UT181Interface::decodeSamples(uint8_t *p, uint8_t count)
+void UT181Interface::decodeSamples(uint8_t *p, uint8_t count) // decode record file samples
 {
   String s;
   s.reserve(4800);
@@ -419,6 +419,26 @@ void UT181Interface::getSaveCount()
 void UT181Interface::DeleteAllSave() // Saves
 {
   static uint8_t cmd[]= {0x09, 0xFF, 0xFF};
+
+  Write(cmd, sizeof(cmd) );
+}
+
+void UT181Interface::deleteSave(int nItem)
+{
+  static uint8_t cmd[]= {0x09, 0, 0};
+
+  cmd[1] = nItem & 0xFF;
+  cmd[2] = nItem >> 8;
+
+  Write(cmd, sizeof(cmd) );
+}
+
+void UT181Interface::deleteRecord(int nItem)
+{
+  static uint8_t cmd[]= {0x0F, 0, 0};
+
+  cmd[1] = nItem & 0xFF;
+  cmd[2] = nItem >> 8;
 
   Write(cmd, sizeof(cmd) );
 }
