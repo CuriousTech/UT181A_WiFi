@@ -74,11 +74,9 @@ UdpTime utime;
 eeMem eemem;
 
 UT181Interface ut;
+uint32_t oldOpt;
 
-uint16_t displayTimer;
-uint8_t oldSW, oldSel;
-
-String timeFmt(uint32_t val)
+String timeFmt(uint32_t val) // convert seconds to hh:mm:ss
 {
   int s = val % 60;
   int m = val / 60 % 60;
@@ -94,37 +92,37 @@ String timeFmt(uint32_t val)
   return st;
 }
 
-String dataJson()
+String dataJson() // main meter data 10Hz,5Hz,2Hz
 {
   int nMin, nMax, nMod;
   ut.RangeMod(nMin, nMax, nMod);
 
   String s = "state;{";
   s += "\"t\":";    s += now() - ( (ee.tz + utime.getDST() ) * 3600);
-  s += ",\"v\":\""; s += ut.ValueText(0);
-  s += "\",\"u\":\""; s += ut.UnitText();
-  s += "\",\"v1\":\"";
-  if(ut.m_MData.Recording)
+  s += ",\"v\":\""; s += ut.ValueText(0); // primary value
+  s += "\",\"u\":\""; s += ut.UnitText(); // unit of measurement
+  s += "\",\"v1\":\""; // secondary value
+  if(ut.m_MData.Recording) // reording timer
   {
     s += timeFmt(ut.m_MData.u.RecTimer.dwElapsed);
     s += "\",\"v2\":\""; s += timeFmt(ut.m_MData.u.RecTimer.dwRemain);
     s += "\",\"v3\":\""; s += ut.m_MData.u.RecTimer.dwSamples;
   }
-  else
+  else // normal and others
   {
-    if(ut.m_MData.Comp)
+    if(ut.m_MData.Comp) // comp mode
       s += ut.m_MData.u.Comp.Fail ? "FAIL" : "PASS";
     else
       s += ut.ValueText(1);
     s += "\",\"v2\":\""; s += ut.ValueText(2);
     s += "\",\"v3\":\""; s += ut.ValueText(3);
   }
-  s += "\",\"mn\":"; s += nMin;
+  s += "\",\"mn\":"; s += nMin; // min/max for bar display
   s += ",\"mx\":"; s += nMax;
   s += ",\"md\":"; s += nMod;
-  s += ",\"st\":"; s += ut.StatusBits();
+  s += ",\"st\":"; s += ut.StatusBits(); // all the single bit flags
 
-  if(ut.m_MData.MinMax)
+  if(ut.m_MData.MinMax) // min max trigger times
   {
     s += ",\"t1\":"; s += ut.m_MData.u.MM.dwTime1;
     s += ",\"t2\":"; s += ut.m_MData.u.MM.dwTime2;
@@ -140,13 +138,13 @@ String dataJson()
   return s;
 }
 
-void fixDeg(char *p)
+void fixDeg(char *p) // deg kills websocket (try \xB0)
 {
   if(*p == 0xB0) *p = '@'; // convert degree to ampersand
   if(p[1] == 0xB0) p[1] = '@';
 }
 
-String rangesJson()
+String rangesJson() // get range and select options for dropdowns
 {
   static char *rangeList[10][3][10] = {
     {{"Auto", "6", "60", "600", "1000", NULL}, {"Auto", NULL}, {"Auto", NULL}},
@@ -205,7 +203,7 @@ String rangesJson()
   }
   s += ']';
 
-  if(ut.m_MData.MinMax)
+  if(ut.m_MData.MinMax) // extended units of measurement
   {
     fixDeg(ut.m_MData.u.MM.szUnit);    
     s += ",\"u1\":\""; s += ut.m_MData.u.MM.szUnit;
@@ -252,7 +250,7 @@ String rangesJson()
     s += ",\"u3\":\"\"";
   }
 
-  if(ut.m_MData.MinMax)
+  if(ut.m_MData.MinMax) // labels
   {
       s += ",\"l0\":\"MAX MIN\"";
       s += ",\"l1\":\"Maximum\"";
@@ -263,7 +261,7 @@ String rangesJson()
   {
       s += ",\"l0\":\"REC\""; 
       s += ",\"l1\":\"Elapsed Time:\"";
-      s += ",\"l2\":\"Remaining Time:\"";
+      s += ",\"l2\":\"Remain Time:\"";
       s += ",\"l3\":\"Samples:\"";
   }
   else if(ut.m_MData.Rel)
@@ -312,25 +310,24 @@ String rangesJson()
   return s;
 }
 
-String settingsJson()
+String settingsJson() // EEPROM settings
 {
   String s = "settings;{";
   s += "\"tz\":"; s += ee.tz;
   s += ",\"o\":"; s += ee.bEnableOLED;
   s += ",\"f\":"; s += ee.exportFormat;
+  s += ",\"r\":"; s += ee.rate;
   s += "}\n";
   return s;
 }
 
-void parseParams(AsyncWebServerRequest *request)
+void parseParams(AsyncWebServerRequest *request) // parse URL params
 {
   char sztemp[100];
   char password[64];
  
   if(request->params() == 0)
     return;
-
-//  Serial.println("parseParams");
 
   for ( uint8_t i = 0; i < request->params(); i++ ) {
     AsyncWebParameter* p = request->getParam(i);
@@ -346,9 +343,6 @@ void parseParams(AsyncWebServerRequest *request)
           display.clear();
           display.display();
           break;
-      case 'r': // WS update rate
-          ee.rate = val;
-          break;
       case 's': // ssid
           s.toCharArray(ee.szSSID, sizeof(ee.szSSID));
           break;
@@ -359,7 +353,7 @@ void parseParams(AsyncWebServerRequest *request)
   }
 }
 
-const char *jsonList1[] = { "cmd",
+const char *jsonList1[] = { "cmd", // WebSocket commands
   "oled", // 0
   "TZ",
   "hold",
@@ -376,10 +370,13 @@ const char *jsonList1[] = { "cmd",
   "file",
   "snap", //14
   "fmt",
+  "delf",
+  "dels",
+  "rate",
   NULL
 };
 
-void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
+void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue) // handle WebSocket commands
 {
   uint8_t sel;
   static char szName[16];
@@ -425,6 +422,8 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           strncpy(szName, psValue, sizeof(szName)-1);
           break;
         case 10: // interval
+          if(strlen(psValue)==0)
+            iValue = 1;
           wInterval = iValue;
           break;
         case 11: //save (duration)
@@ -432,11 +431,17 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
             ut.Save();
           else
           {
-            if(strlen(szName) == 0)
-              strcpy(szName, "Record_01");
-            if(wInterval == 0)
-              break;
+            if(strlen(szName) == 0) strcpy(szName, "Record_01");
+            if(wInterval == 0) wInterval = 1;
             ut.StartRecord(szName, wInterval, iValue);
+            String s ="";
+            s += "print;Start record ";
+            s += szName;
+            s += " ";
+            s += wInterval;
+            s += " ";
+            s += iValue;
+            WsSend(s);
           }
           break;
         case 12: // stop
@@ -451,6 +456,15 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue)
           break;
         case 15: // fmt
           ee.exportFormat = iValue;
+          break;
+        case 16: // delf
+          ut.deleteRecord(iValue + 1);
+          break;
+        case 17: //dels
+          ut.deleteSave(iValue + 1);
+          break;
+        case 18: // rate
+          ee.rate = iValue;
           break;
       }
       break;
@@ -528,28 +542,22 @@ void sendRecordEntry(Record *pRecord)
   ws.textAll(s);
 }
 
-void WsSend(String s)
+void WsSend(String s) // send packat directly (preformatted)
 {
   ws.textAll(s);  
 }
 
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
 {  //Handle WebSocket event
-  static bool bRestarted = true;
 
   switch(type)
   {
     case WS_EVT_CONNECT:      //client connected
-      if(bRestarted)
-      {
-        bRestarted = false;
-        client->text("alert;Restarted");
-      }
       client->keepAlivePeriod(50);
       client->text(dataJson());
       client->text(settingsJson());
       client->ping();
-      oldSW = 20;
+      oldOpt = 0;
       break;
     case WS_EVT_DISCONNECT:    //client disconnected
       break;
@@ -577,9 +585,9 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 }
 
 void onBinEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
-{  //Handle WebSocket event
+{  //Handle binary WebSocket event (/bin)
   String s;
-  uint8_t buf[] = {1,8,1,0xA};
+  uint8_t buf[] = {1,8,1,0xA}; // identifier response
 
   switch(type)
   {
@@ -611,12 +619,6 @@ volatile bool bButtonPressed;
 void btnISR() // Prog button on board
 {
   bButtonPressed = true;
-}
-
-void handleFileList(AsyncWebServerRequest *request)
-{
-  String s = "";
-  request->send( 200, "text/html", s );
 }
 
 void setup()
@@ -678,6 +680,7 @@ void setup()
   server.serveStatic("/shock.png", SPIFFS, "/shock.png");
   server.serveStatic("/diode.png", SPIFFS, "/diode.png");
   server.serveStatic("/favicon.ico", SPIFFS, "/favicon.ico");
+  server.serveStatic("/del-btn.png", SPIFFS, "/del-btn.png");
 #else
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request){
     AsyncWebServerResponse *response = request->beginResponse_P(200, "image/x-icon", favicon, sizeof(favicon));
@@ -694,6 +697,10 @@ void setup()
   });
   server.on("/diode.png", HTTP_GET, [](AsyncWebServerRequest *request){
     AsyncWebServerResponse *response = request->beginResponse_P(200, "image/png", diode_png, sizeof(diode_png));
+    request->send(response);
+  });
+  server.on("/del-btn.png", HTTP_GET, [](AsyncWebServerRequest *request){
+    AsyncWebServerResponse *response = request->beginResponse_P(200, "image/png", delbtn_png, sizeof(delbtn_png));
     request->send(response);
   });
 #endif
@@ -719,8 +726,6 @@ void setup()
   jsonParse.addList(jsonList1);
 
   utime.start();
-  if(ee.rate == 0)
-    ee.rate = 60;
 
   attachInterrupt(BUTTON, btnISR, FALLING);
   digitalWrite(ESP_LED, HIGH); // blue LED off
@@ -735,7 +740,6 @@ void loop()
 {
   static uint8_t hour_save, sec_save;
   static uint8_t cnt;
-  static uint32_t oldOpt;
   time_t nw;
 
   MDNS.update();
@@ -747,19 +751,18 @@ void loop()
   nw = now();
   ut.service(nw); // read serial data
 
-  if(ut.Updated())
+  if(ut.Updated()) // new packet ready
     ws.textAll(dataJson());
 
-  if(oldSW != ut.m_MData.Switch || oldSel != ut.m_MData.Select || oldOpt != *(uint32_t*)(&ut.m_MData))
+  // only update the extras when settings change
+  if(oldOpt != *(uint32_t*)(&ut.m_MData))
   {
-    oldOpt = *(uint32_t*)(&ut.m_MData);
-    oldSW = ut.m_MData.Switch;
-    oldSel = ut.m_MData.Select;
+    oldOpt = *(uint32_t*)(&ut.m_MData); // switch/sel is here as well
     ws.textAll(rangesJson());
   }
 
   int s = second(nw);
-  if(sec_save != s) // only do stuff once per second (loop is maybe 20-30 Hz)
+  if(sec_save != s) // only do stuff once per second
   {
     sec_save = s;
     if(s == 0 && hour_save != hour(nw))
@@ -779,9 +782,6 @@ void loop()
       if(ut.m_bConnected == false)
         ut.Connect(true);
     }
-
-    if(displayTimer) // temp display on thing
-      displayTimer--;
   }
 
   // draw the screen here
