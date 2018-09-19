@@ -129,6 +129,10 @@ ws.onmessage=function(evt){
  {
   alert(data)
  }
+ else if(event == 'print')
+ {
+  console.log(data)
+ }
  else if(event == 'range')
  {
   d=JSON.parse(data)
@@ -327,8 +331,10 @@ function openRec()
 }
 function startRec()
 {
- document.getElementById('rec').style.display="none";
- ws.send('cmd;{"name":"'+a.name.value+'","interval":"'+a.interval.value+'","sav":"'+a.duration.value+'"}')
+ document.getElementById('rec').style.display="none"
+ dur=a.duration.value
+ if(dur==0) dur=60
+ ws.send('cmd;{"name":"'+a.name.value+'","interval":"'+a.interval.value+'","sav":"'+dur+'"}')
 }
 function cancelRec()
 {

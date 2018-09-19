@@ -104,9 +104,35 @@ function getsnap(idx)
 {
   ws.send('cmd;{"snap":'+idx+'}')
 }
+function delfile(idx)
+{
+  ws.send('cmd;{"delf":'+idx+'}')
+  l=document.getElementById('tbody'+idx)
+  a.list.removeChild(l)
+}
+function delsnap(idx)
+{
+  ws.send('cmd;{"dels":'+idx+'}')
+  l=document.getElementById('tbody'+idx)
+  a.list.removeChild(l)
+}
+
 function AddFile(type,arr)
 {
   tr=document.createElement("tr")
+  td=document.createElement("td")
+  inp=document.createElement("input")
+  inp.value=arr[0]
+  inp.id=idx
+  inp.type='image'
+  inp.src='del-btn.png'
+  if(type)
+	inp.onclick=function(){delfile(this.id)}
+  else
+	inp.onclick=function(){delsnap(this.id)}
+  td.appendChild(inp)
+  tr.appendChild(td)
+
   td=document.createElement("td")
   inp=document.createElement("input")
   inp.value=arr[0]
@@ -118,14 +144,16 @@ function AddFile(type,arr)
 	inp.onclick=function(){getsnap(this.id)}
   td.appendChild(inp)
   tr.appendChild(td)
+
   for(i=1;i<arr.length;i++){
 	td=document.createElement("td")
 	td.appendChild(document.createTextNode(fixLabel(arr[i])))
 	tr.appendChild(td)
   }
   tbody=document.createElement("tbody")
+  tbody.id='tbody'+idx
   tbody.appendChild(tr)
-  document.getElementById("list").appendChild(tbody)
+  a.list.appendChild(tbody)
   idx++
 }
 
@@ -155,7 +183,7 @@ function getFiles(varName)
 <td><div id="status"></div></td></tr>
 </table>
 &nbsp
-<table style="font-size:x-small" id="list" width="440">
+<table style="font-size:small" id="list" width="550">
 </table>
 </div>
 </body>
