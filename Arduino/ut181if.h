@@ -223,7 +223,7 @@ public:
   void Connect(bool bCon);
   bool Updated(void);
   bool WriteData(uint8_t *pData, int len);
-  const char *convertDate(uniDate &dt);
+  String convertDate(uniDate &dt);
   char *ValueText(int which);
   char *ValueText(MValue &mv);
   char *UnitText(void);
@@ -243,6 +243,7 @@ public:
   void StartRecord(char *pName, uint16_t wInterval, uint32_t dwDuration);
   void StopRecord(void);
   void startRecordRetreval(int nItem, char *pszUnit, uint32_t dwSamples);
+  int readPercent(void);
 
 private:
   uint16_t getWord(uint8_t *p);
@@ -254,27 +255,28 @@ private:
   void decodeSamples(uint8_t *p, uint8_t count);
   void getRecordData(void);
   void getSave(uint16_t nItem);
+  time_t uniDateToGTC(uniDate &dt);
 
-  uint8_t  m_buffer[2800]; // 2800 required for records (2254)
-  uint8_t  m_idx;
+  uint8_t  m_buffer[3200]; // 2800 required for records (2254)
+  uint16_t m_idx;
   uint8_t  m_state;
   uint16_t m_len;
   int      m_Updated;
 
-  uint16_t  m_nSaves;
-  uint16_t  m_nRecords;
-  uint8_t   m_nRecReq;
-  int    m_nRecIdx;
-  bool   m_bGetRecStart;
-  int    m_nRecordItem;
-  int    m_nRecDataIndexEnd;
-  int    m_nRecDataIndex;
-  bool   m_bSign;
+  uint16_t m_nSaves;
+  uint16_t m_nRecords;
+  uint8_t  m_nRecReq;
+  bool     m_bGetRecStart;
+  bool     m_bSign;
+  int      m_nRecIdx;
+  int      m_nRecordItem;
+  int      m_nRecDataIndexEnd;
+  int      m_nRecDataIndex;
   uint32_t m_keepAlive;
-  char   m_szRecUnit[12];
+  char     m_szRecUnit[12];
 public:
-  MData   m_MData;
-  bool    m_bConnected;
+  MData    m_MData;
+  bool     m_bConnected;
 };
 
 #endif
