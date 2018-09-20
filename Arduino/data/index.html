@@ -60,7 +60,7 @@ z-index:1;
 </style>
 <script type="text/javascript">
 a=document.all
-oledon=0;v=0;min=-60;max=60;mod=5;st=1073676544;lastst=0
+oledon=0;v=0;min=-60;max=60;mod=5;st=0;lastst=0;rate=0
 va=new Array()
 function startWS(){
 draw_bar(0)
@@ -93,13 +93,13 @@ ws.onmessage=function(evt){
 	a.v2.innerHTML=d.v2
 	a.v3.innerHTML=d.v3
 	v=+d.v
-	aa=[v,dt]
+	aa=[dt,v,+d.v1,+d.v2,+d.v3]
 	va.push(aa)
 	min=+d.mn
 	max=+d.mx
 	mod=+d.md
 	st=+d.st
-	if(max){
+	if(mod){
 		a.bar.setAttribute('style','')
 		draw_bar(d.v=='0L'?1:0)
 	}else a.bar.setAttribute('style','display:none')
@@ -298,27 +298,31 @@ try {
 	m=0
 	for(i=1,x=21;i<va.length;i++,x++)
 	{
-		if(va[i][1].getSeconds()==0&&va[i][1].getMinutes()!=m)
+		if(va[i][0].getSeconds()==0&&va[i][0].getMinutes()!=m)
 		{
 			ctx.beginPath()
 		    ctx.moveTo(x,h+10)
 		    ctx.lineTo(x,10)
 			ctx.stroke()
-			m=va[i][1].getMinutes()
+			m=va[i][0].getMinutes()
 		}
 	}
 
 	ciel=max
-	y=base-(va[0][0]/ciel*range)
-	ctx.strokeStyle = "#FFF"
-	ctx.beginPath()
-    ctx.moveTo(20, y)
-	for(i=1,x=21;i<va.length;i++,x++)
+	colors=[0,'#FFF','#00F','#0F0','#FF0','#0FF']
+	for(line=4;line>0;line--)
 	{
-		y=base-(va[i][0]/ciel*range)
-	    ctx.lineTo(x, y)
+		y=base-(va[0][line]/ciel*range)
+		ctx.strokeStyle = colors[line]
+		ctx.beginPath()
+	    ctx.moveTo(20,y)
+		for(i=1,x=21;i<va.length;i++,x++)
+		{
+			y=base-(va[i][line]/ciel*range)
+		    ctx.lineTo(x,y)
+		}
+		ctx.stroke()
 	}
-	ctx.stroke()
 }catch(err){}
 }
 
@@ -340,19 +344,26 @@ function cancelRec()
 {
  document.getElementById('rec').style.display="none";
 }
+function chgRate()
+{
+ rates=['100ms','200ms','500ms','1 sec','2 sec','5 sec','10sec','30sec',' 1 min']
+ if(++rate>8) rate=0
+ a.rate.value=rates[rate]
+ setVar('rate',rate)
+}
 
 </script>
 <body bgcolor="black" text="silver"  onload="{startWS()}">
 <div><h3 align="center">WiFi UT181A</h3>
 
-<table align=center width=320>
+<table align=center width=360>
 <tr align=center><td colspan=2><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td width=70></td><td></td></tr>
 <tr align=center><td width=50><td><div id="mm" width=70></div></td><td width=50><div id="h"></div></td><td width=70><div id="am">AUTO</div></td></tr>
 </table>
-<table align=center width=320>
+<table align=center width=360>
 <tr align=center><td width=150 align="right" colspan=2><div id="value" style="font-size:xx-large">0L</div></td><td><div id="unit">DCV</div></td>
 <td><div id="pm"></div><img id="imag" src='' style="width:38px"></td></tr>
-<tr><td colspan=4><canvas id="bar" width="300" height="40" style="float:center"></td></tr>
+<tr><td colspan=4><canvas id="bar" width="360" height="40" style="float:center"></td></tr>
 <tr><td><div id="l1"></div></td><td><div id="v1"></div></td><td><div id="u1"></div></td><td align="right"><div id="t1"></div></td></tr>
 <tr><td><div id="l2"></div></td><td><div id="v2"></div></td><td><div id="u2"></div></td><td align="right"><div id="t2"></div></td></tr>
 <tr><td><div id="l3"></div></td><td><div id="v3"></div></td><td><div id="u3"></div></td><td align="right"><div id="t3"></div></td></tr>
@@ -393,12 +404,12 @@ function cancelRec()
   </div>
 </div>
 <input type="button" value="REL" id="REL" onClick="{setVar('rel', 0)}">
-<input id='rval' type=text size=4 value='0'> &nbsp <input type="button" value="M/M" id="M/M" onClick="{setVar('mm', 0)}"></td></tr>
+<input id='rval' type=text size=4 value='0'> &nbsp<input type="button" value="M/M" id="M/M" onClick="{setVar('mm', 0)}"> <input type="button" value="100ms" id="rate" onClick="{chgRate()}"></td></tr>
 <tr><td colspan=4></td></tr>
-<tr><td colspan=4><canvas id="chart" width="300" height="300" style="float:center"></td></tr>
+<tr><td colspan=4><canvas id="chart" width="360" height="300" style="float:center"></td></tr>
 <tr><td colspan=4>&nbsp </td></tr>
-<tr><td>OLED:<input type="button" value="ON" id="OLED" onClick="{oled()}"></td><td>
-<input type="button" value="Save" onClick="{setVar('sav', 0)}"> <input type="button" id="record" value="Record" onClick="{openRec()}">
+<tr><td width="95">OLED:<input type="button" value="ON" id="OLED" onClick="{oled()}"></td>
+<td width="110"><input type="button" value="Save" onClick="{setVar('sav', 0)}"> <input type="button" id="record" value="Record" onClick="{openRec()}">
 </td><td><input type="submit" value="Files" onClick="window.location='/files.html';"></td><td><input type="submit" value="Setup" onClick="window.location='/s';"></td></tr>
 </table>
 &nbsp
