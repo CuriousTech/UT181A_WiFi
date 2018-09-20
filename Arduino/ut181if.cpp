@@ -569,26 +569,6 @@ void UT181Interface::RangeMod(int &nMin, int &nMax, int &nMod)
 {
   getSign();
 
-  if(m_MData.Peak || m_MData.MinMax)
-  {
-    nMin = nMax = nMod = 0;
-    return;
-  }
-
-  switch(m_MData.dataType) // no bar modes
-  {
-    case 0x01: // T1
-      nMin = nMax = nMod = 0;
-      return;
-    case 0x3: // T1-T2 // Todo: fix data for mVac+dc
-      if(m_MData.Switch == eSwitch_mVDC)
-      {
-        nMin = nMax = nMod = 0;
-        return;
-      }
-      break;
-  }
-
   nMin = 0;
   nMax = 60;
   nMod = 5;
@@ -637,6 +617,19 @@ void UT181Interface::RangeMod(int &nMin, int &nMax, int &nMod)
   nMod = rangeListMod[sw][sel][r] ? 10:5;
   if(nMax == 1000)
     nMod = 12;
+
+  if(m_MData.Peak || m_MData.MinMax) // no bar
+    nMod = 0;
+
+  switch(m_MData.dataType) // no bar modes
+  {
+    case 0x1: // T1
+      nMod = 0;
+    case 0x3: // T1-T2
+      if(m_MData.Switch == eSwitch_mVDC)
+        nMod = 0;
+      break;
+  }
 }
 
 void UT181Interface::getSign()
