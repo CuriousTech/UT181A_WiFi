@@ -14,6 +14,7 @@ struct eeSet // EEPROM backed data
   bool     bEnableOLED;
   uint8_t  exportFormat;
   uint16_t rate;
+  uint32_t updateTime;
 };
 
 extern eeSet ee;
