@@ -9,7 +9,7 @@ The code is mostly complete. The graph needs more work, and update rate needs to
 ![Image](https://www.curioustech.net/images/ut181wifi.jpg)  
 
 Web page  
-![Web](https://www.curioustech.net/images/ut181web.png)  
+![Web](https://www.curioustech.net/images/ut181aweb2.png)  
 
 File manager.  Click Saves or Records for listings. Click on files to download, and X to delete.  
 ![Web](https://www.curioustech.net/images/ut181awebfile.png)  
