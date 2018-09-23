@@ -75,6 +75,7 @@ eeMem eemem;
 
 UT181Interface ut;
 uint32_t oldOpt;
+uint16_t skipCnt;
 
 String timeFmt(uint32_t val) // convert seconds to hh:mm:ss
 {
@@ -101,9 +102,9 @@ String dataJson() // main meter data 10Hz,5Hz,2Hz
   s += "\"t\":";    s += now() - ( (ee.tz + utime.getDST() ) * 3600);
   s += ",\"v\":\""; s += ut.ValueText(0); // primary value
   s += "\",\"u\":\""; s += ut.UnitText(); // unit of measurement
-  s += "\",\"v1\":\""; // secondary value
   if(ut.m_MData.Recording) // reording timer
   {
+    s += "\",\"v1\":\""; // secondary value
     s += timeFmt(ut.m_MData.u.RecTimer.dwElapsed);
     s += "\",\"v2\":\""; s += timeFmt(ut.m_MData.u.RecTimer.dwRemain);
     s += "\",\"v3\":\""; s += ut.m_MData.u.RecTimer.dwSamples;
@@ -111,16 +112,34 @@ String dataJson() // main meter data 10Hz,5Hz,2Hz
   else // normal and others
   {
     if(ut.m_MData.Comp) // comp mode
+    {
+      s += "\",\"v1\":\""; // secondary value
       s += ut.m_MData.u.Comp.Fail ? "FAIL" : "PASS";
+    }
     else
-      s += ut.ValueText(1);
-    s += "\",\"v2\":\""; s += ut.ValueText(2);
-    s += "\",\"v3\":\""; s += ut.ValueText(3);
+    {
+      if(ut.DisplayCnt() > 1){
+        s += "\",\"v1\":\""; // secondary value
+        s += ut.ValueText(1);
+      }
+    }
+    if(ut.DisplayCnt() > 2){ s += "\",\"v2\":\""; s += ut.ValueText(2); }
+    if(ut.DisplayCnt() > 3){ s += "\",\"v3\":\""; s += ut.ValueText(3); }
   }
   s += "\",\"mn\":"; s += nMin; // min/max for bar display
   s += ",\"mx\":"; s += nMax;
   s += ",\"md\":"; s += nMod;
   s += ",\"st\":"; s += ut.StatusBits(); // all the single bit flags
+
+  bool bAdd = (ut.m_MData.Value.L || ut.m_MData.Value.Blank || ut.m_MData.LeadErr || ut.m_MData.Hold) ? false:true; // skip blanks
+  static uint16_t skipList[] = {0,1,4,9,19,49,99,299,599}; // chart logging frequency
+  if(ee.rate)
+  {
+    if(skipCnt++ >= skipList[ee.rate])
+      skipCnt = 0;
+    else bAdd = false;
+  }
+  s += ",\"a\":"; s += bAdd; // add to chart
 
   if(ut.m_MData.MinMax) // min max trigger times
   {
@@ -173,6 +192,19 @@ String rangesJson() // get range and select options for dropdowns
     {{"ADC", "AC+DC", "Peak", NULL}, {"AAC", "AAC,Hz", "Peak", NULL}, {NULL}},
   };
 
+  static char *selList[10][4] = {
+    {"VAC", NULL, NULL},
+    {"mVAC", NULL, NULL},
+    {"VDC", NULL, NULL },
+    {"mVDC", "C", "F",NULL},
+    {"Ohms", "Beep", "nS", NULL},
+    {"Diode", "Cap", NULL},
+    {"Hz", "%", "Pulse",NULL},
+    {"µADC", "µAAC", NULL},
+    {"mADC", "mAAC", NULL},
+    {"ADC", "AAC", NULL},
+  };
+
   uint8_t sw = ut.m_MData.Switch - 1;
   if(sw >= 10) sw = 0;
   uint8_t sel = ut.m_MData.Select - 1;
@@ -184,7 +216,16 @@ String rangesJson() // get range and select options for dropdowns
   s += ",\"os\":";
   s += ut.m_MData.Select;
 
-  s += ",\"r\":[";
+  s += ",\"s\":[";
+  for(i = 0; selList[sw][i]; i++)
+  {
+    if(i) s += ",";
+    s += "[\"";
+    s += selList[sw][i];
+    s += "\"]";
+  }
+
+  s += "],\"r\":[";
   for(i = 0; rangeList[sw][sel][i]; i++)
   {
     if(i) s += ",";
@@ -193,7 +234,6 @@ String rangesJson() // get range and select options for dropdowns
     s += "\"]";
   }
   s += "],\"o\":[";
-
   for(i = 0; optList[sw][sel][i]; i++)
   {
     if(i) s += ",";
@@ -360,6 +400,7 @@ const char *jsonList1[] = { "cmd", // WebSocket commands
   "mm", // minmax
   "range",
   "sel",
+  "opt",
   "rel",
   "rec",
   "svs",
@@ -403,30 +444,33 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue) // 
           ut.SetRange(iValue);
           break;
         case 5: // select
-          ut.SetSelect(iValue, false, 0);
+          ut.SetSelect(iValue, 0, false, 0);
           break;
-        case 6: // rel
+        case 6: // opt
+          ut.SetSelect(ut.m_MData.Select, iValue, false, 0);
+          break;
+        case 7: // rel
           sel = ut.m_MData.Select;
           if(ut.m_MData.Rel)
-            ut.SetSelect(sel, false, 0);
+            ut.SetSelect(sel, 0, false, 0);
           else
-            ut.SetSelect(sel, true, ut.GetfValue());
+            ut.SetSelect(sel, 0, true, ut.GetfValue());
           break;
-        case 7: // records
+        case 8: // records
           ut.getRecordCount();
           break;
-        case 8: // saves
+        case 9: // saves
           ut.getSaveCount();
           break;
-        case 9: // name
+        case 10: // name
           strncpy(szName, psValue, sizeof(szName)-1);
           break;
-        case 10: // interval
+        case 11: // interval
           if(strlen(psValue)==0)
             iValue = 1;
           wInterval = iValue;
           break;
-        case 11: //save (duration)
+        case 12: //save (duration)
           if(iValue == 0)
             ut.Save();
           else
@@ -444,27 +488,28 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue) // 
             WsSend(s);
           }
           break;
-        case 12: // stop
+        case 13: // stop
           if(ut.m_MData.Recording)
             ut.StopRecord();
           break;
-        case 13: // file
+        case 14: // file
           ut.startRecordRetreval(iValue, szName, wInterval);
           break;
-        case 14: // snap
+        case 15: // snap
 //        ut.getSave(iValue, true);
           break;
-        case 15: // fmt
+        case 16: // fmt
           ee.exportFormat = iValue;
           break;
-        case 16: // delf
+        case 17: // delf
           ut.deleteRecord(iValue + 1);
           break;
-        case 17: //dels
+        case 18: //dels
           ut.deleteSave(iValue + 1);
           break;
-        case 18: // rate
+        case 19: // rate
           ee.rate = iValue;
+          skipCnt = 0;
           break;
       }
       break;
@@ -752,8 +797,9 @@ void loop()
   ut.service(nw); // read serial data
 
   if(ut.Updated()) // new packet ready
+  {
     ws.textAll(dataJson());
-
+  }
   // only update the extras when settings change
   if(oldOpt != *(uint32_t*)(&ut.m_MData))
   {
