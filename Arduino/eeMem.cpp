@@ -8,6 +8,7 @@ eeSet ee = { sizeof(eeSet), 0xAAAA,
   false,    // OLED
   0,        // exportFormat
   0,     // rate
+  0,     //time check
 };
 
 eeMem::eeMem()
