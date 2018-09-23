@@ -7,22 +7,20 @@
 enum UT_CMD{
   CMD_SET_OPTION = 1,
   CMD_SET_RANGE,
-  CMD_03,
+  CMD_SET_REL,
   CMD_SET_MINMAX,
   CMD_CONNECT,
   CMD_SAVE,
   CMD_GET_SAVE,
   CMD_GET_SAVE_COUNT,
-  CMD_DELETE_ALL_SAVE,
   CMD_DELETE_SAVE_ITEM,
   CMD_RECORD_START,
   CMD_STOP_RECORD,
   CMD_GET_RECORD,
   CMD_GET_RECORD_DATA,
   CMD_GET_RECORD_COUNT,
-  CMD_DELETE_ALL_RECORDS,
   CMD_DELETE_RECORD_ITEM,
-  CMD_10,
+  CMD_SET_CLOCK,
   CMD_11,
   CMD_HOLD,
 };
@@ -50,6 +48,11 @@ struct uniDate{
   uint32_t hours:5;
   uint32_t minutes:6;
   uint32_t seconds:6;
+};
+
+union uddw{
+    uint32_t dw;
+    uniDate ud;
 };
 
 struct MValue
@@ -229,7 +232,7 @@ public:
   char *UnitText(void);
   int DisplayCnt(void);
   void SetRange(uint8_t n);
-  void SetSelect(uint8_t nSel, bool bRel, float fValue);
+  void SetSelect(uint8_t nSel, uint8_t nOpt, bool bRel, float fValue);
   float GetfValue(void);
   void Hold(void);
   void MinMax(void);
@@ -246,6 +249,7 @@ public:
   int readPercent(void);
   void deleteSave(int nItem);
   void deleteRecord(int nItem);
+  void setClock();
 private:
   uint16_t getWord(uint8_t *p);
   uint16_t sum(uint8_t *p, uint16_t len);
