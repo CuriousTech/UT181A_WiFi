@@ -1,4 +1,5 @@
 #include "ut181if.h"
+#include "eeMem.h"
 #include <TimeLib.h>
 
 extern void sendBinData(uint8_t *p, int len);
@@ -201,7 +202,7 @@ void UT181Interface::startRecordRetreval(int nItem, char *pszUnit, uint32_t dwSa
 
 void UT181Interface::Connect(bool bCon) // start/stop meter data transmit
 {
-  static uint8_t cmd[]= {0x05,0x00};
+  static uint8_t cmd[]= {CMD_CONNECT,0x00};
 
   if( m_nRecReq || m_nRecordItem) // in download mode
     return;
@@ -251,15 +252,15 @@ bool UT181Interface::Write(uint8_t *p, uint8_t len)
 }
 
 // Select and REL + rel value
-void UT181Interface::SetSelect(uint8_t nSel, bool bRel, float fValue)
+void UT181Interface::SetSelect(uint8_t nSel, uint8_t nOpt, bool bRel, float fValue)
 {
-  uint8_t cmd[]= {0x01,0, (m_MData.Switch << 4) | m_MData.Select};
+  uint8_t cmd[]= {CMD_SET_OPTION,0, (m_MData.Switch << 4) | nSel};
 
-  cmd[1] = ((nSel + 1) << 4) | (bRel ? 2:1);
+  cmd[1] = ((nOpt + 1) << 4) | (bRel ? 2:1);
 
   if(cmd[2] == 0x52 || cmd[2] == 0x61) // sub mode
   {
-    cmd[1] = 0x10 | (nSel + 1);
+    cmd[1] = 0x10 | (nOpt + 1);
   }
 
   Write(cmd, sizeof(cmd) );
@@ -273,7 +274,7 @@ void UT181Interface::SetSelect(uint8_t nSel, bool bRel, float fValue)
       };
       #pragma pack(pop)
 
-      relCmd rc = {3, fValue};
+      relCmd rc = {CMD_SET_REL, fValue};
 
       Write((uint8_t*)&rc, sizeof(rc) );
   }
@@ -286,7 +287,7 @@ float UT181Interface::GetfValue()
 
 void UT181Interface::SetRange(uint8_t n)  // 0 = auto, 1 = range 1...8
 {
-  static uint8_t cmd[]= {0x02,0x00};
+  static uint8_t cmd[]= {CMD_SET_RANGE,0x00};
 
   cmd[1] = n;
   Write(cmd, sizeof(cmd) );
@@ -294,13 +295,13 @@ void UT181Interface::SetRange(uint8_t n)  // 0 = auto, 1 = range 1...8
 
 void UT181Interface::Hold()
 {
-  static uint8_t cmd[]= {0x12,0x5A}; // Z
+  static uint8_t cmd[]= {CMD_HOLD,0x5A}; // Z
   Write(cmd, sizeof(cmd) );
 }
 
 void UT181Interface::MinMax() // toggle
 {
-  static uint8_t cmd[]= {0x04,0x00};
+  static uint8_t cmd[]= {CMD_SET_MINMAX,0x00};
   cmd[1] = m_MData.MinMax ? 0:1;
   Write(cmd, sizeof(cmd) );
 }
@@ -332,7 +333,7 @@ void UT181Interface::GetRecordSeq() // get next record or save (redundant?)
 
 void UT181Interface::getRecord(uint16_t nItem) // get a record entry
 {
-  uint8_t cmd[]= {0x0C, 0, 0};
+  uint8_t cmd[]= {CMD_GET_RECORD, 0, 0};
 
   cmd[1] = nItem & 0xFF;
   cmd[2] = nItem >> 8;
@@ -341,7 +342,7 @@ void UT181Interface::getRecord(uint16_t nItem) // get a record entry
 
 void UT181Interface::getRecordCount()
 {
-  static uint8_t cmd[]= {0x0E};
+  static uint8_t cmd[]= {CMD_GET_RECORD_COUNT};
 
   Write(cmd, sizeof(cmd) );
 }
@@ -369,7 +370,7 @@ void UT181Interface::getRecordData()
 {
   recReq rr;
 
-  rr.Cmd = 0x0D;
+  rr.Cmd = CMD_GET_RECORD_DATA;
   rr.wItem = m_nRecordItem;
   rr.dwOffset = m_nRecDataIndex + 1;
   Write((uint8_t*)&rr, sizeof(rr) );
@@ -377,7 +378,7 @@ void UT181Interface::getRecordData()
 
 void UT181Interface::Save()
 {
-  static uint8_t cmd[]= {0x06};
+  static uint8_t cmd[]= {CMD_SAVE};
 
   Write(cmd, sizeof(cmd) );
 }
@@ -386,7 +387,7 @@ void UT181Interface::StartRecord(char *pName, uint16_t wInterval, uint32_t dwDur
 {
   recCmd rc;
 
-  rc.Cmd = 0x0A;
+  rc.Cmd = CMD_RECORD_START;
   strcpy(rc.szName, pName);
   rc.wInterval = wInterval;
   rc.dwDuration = dwDuration;
@@ -395,14 +396,14 @@ void UT181Interface::StartRecord(char *pName, uint16_t wInterval, uint32_t dwDur
 
 void UT181Interface::StopRecord()
 {
-  uint8_t cmd[]= {0x0B};
+  uint8_t cmd[]= {CMD_STOP_RECORD};
 
   Write(cmd, sizeof(cmd) );
 }
 
 void UT181Interface::getSave(uint16_t nItem)
 {
-  uint8_t cmd[]= {0x07, 0, 0};
+  uint8_t cmd[]= {CMD_GET_SAVE, 0, 0};
 
   cmd[1] = nItem & 0xFF;
   cmd[2] = nItem >> 8;
@@ -411,21 +412,21 @@ void UT181Interface::getSave(uint16_t nItem)
 
 void UT181Interface::getSaveCount()
 {
-  static uint8_t cmd[]= {0x08};
+  static uint8_t cmd[]= {CMD_GET_SAVE_COUNT};
 
   Write(cmd, sizeof(cmd) );
 }
 
 void UT181Interface::DeleteAllSave() // Saves
 {
-  static uint8_t cmd[]= {0x09, 0xFF, 0xFF};
+  static uint8_t cmd[]= {CMD_DELETE_SAVE_ITEM, 0xFF, 0xFF};
 
   Write(cmd, sizeof(cmd) );
 }
 
 void UT181Interface::deleteSave(int nItem)
 {
-  static uint8_t cmd[]= {0x09, 0, 0};
+  static uint8_t cmd[]= {CMD_DELETE_SAVE_ITEM, 0, 0};
 
   cmd[1] = nItem & 0xFF;
   cmd[2] = nItem >> 8;
@@ -435,7 +436,7 @@ void UT181Interface::deleteSave(int nItem)
 
 void UT181Interface::deleteRecord(int nItem)
 {
-  static uint8_t cmd[]= {0x0F, 0, 0};
+  static uint8_t cmd[]= {CMD_DELETE_RECORD_ITEM, 0, 0};
 
   cmd[1] = nItem & 0xFF;
   cmd[2] = nItem >> 8;
@@ -476,6 +477,34 @@ time_t UT181Interface::uniDateToGTC(uniDate &dt)
   t.Second = dt.seconds;
 
   return makeTime(t);
+}
+
+void UT181Interface::setClock()
+{
+  #pragma pack(push, 1)
+  struct setCmd
+  {
+    uint8_t Cmd;
+    uddw ud;
+  };
+  #pragma pack(pop)
+
+  setCmd cmd;
+  cmd.Cmd = CMD_SET_CLOCK;
+
+  cmd.ud.ud.year = year() - 2000;
+  cmd.ud.ud.month = month();
+  cmd.ud.ud.day = day();
+  cmd.ud.ud.hours = hour();
+  cmd.ud.ud.minutes = minute();
+  cmd.ud.ud.seconds = second();
+
+  uddw cv;
+  cv.dw = ee.updateTime;
+  if(cv.ud.day != day()){ // set time daily
+    ee.updateTime = cmd.ud.dw;
+    Write((uint8_t*)&cmd, sizeof(cmd) );
+  }
 }
 
 int UT181Interface::readPercent()
