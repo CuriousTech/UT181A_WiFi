@@ -76,6 +76,7 @@ eeMem eemem;
 UT181Interface ut;
 uint32_t oldOpt;
 uint16_t skipCnt;
+uint8_t tick;
 
 String timeFmt(uint32_t val) // convert seconds to hh:mm:ss
 {
@@ -100,12 +101,12 @@ String dataJson() // main meter data 10Hz,5Hz,2Hz
 
   String s = "state;{";
   s += "\"t\":";    s += now() - ( (ee.tz + utime.getDST() ) * 3600);
+  s += ",\"tk\":";  s += tick;
   s += ",\"v\":\""; s += ut.ValueText(0); // primary value
   s += "\",\"u\":\""; s += ut.UnitText(); // unit of measurement
-  if(ut.m_MData.Recording) // reording timer
+  if(ut.m_MData.Recording) // recording timer
   {
-    s += "\",\"v1\":\""; // secondary value
-    s += timeFmt(ut.m_MData.u.RecTimer.dwElapsed);
+    s += "\",\"v1\":\""; s += timeFmt(ut.m_MData.u.RecTimer.dwElapsed);
     s += "\",\"v2\":\""; s += timeFmt(ut.m_MData.u.RecTimer.dwRemain);
     s += "\",\"v3\":\""; s += ut.m_MData.u.RecTimer.dwSamples;
   }
@@ -113,16 +114,10 @@ String dataJson() // main meter data 10Hz,5Hz,2Hz
   {
     if(ut.m_MData.Comp) // comp mode
     {
-      s += "\",\"v1\":\""; // secondary value
-      s += ut.m_MData.u.Comp.Fail ? "FAIL" : "PASS";
+      s += "\",\"v1\":\""; s += ut.m_MData.u.Comp.Fail ? "FAIL" : "PASS";
     }
     else
-    {
-      if(ut.DisplayCnt() > 1){
-        s += "\",\"v1\":\""; // secondary value
-        s += ut.ValueText(1);
-      }
-    }
+      if(ut.DisplayCnt()>1){ s += "\",\"v1\":\""; s += ut.ValueText(1); }
     if(ut.DisplayCnt() > 2){ s += "\",\"v2\":\""; s += ut.ValueText(2); }
     if(ut.DisplayCnt() > 3){ s += "\",\"v3\":\""; s += ut.ValueText(3); }
   }
@@ -193,9 +188,9 @@ String rangesJson() // get range and select options for dropdowns
   };
 
   static char *selList[10][4] = {
-    {"VAC", NULL, NULL},
-    {"mVAC", NULL, NULL},
-    {"VDC", NULL, NULL },
+    {"VAC", NULL},
+    {"mVAC", NULL},
+    {"VDC", NULL },
     {"mVDC", "C", "F",NULL},
     {"Ohms", "Beep", "nS", NULL},
     {"Diode", "Cap", NULL},
@@ -265,12 +260,12 @@ String rangesJson() // get range and select options for dropdowns
     s += "\",\"u2\":\""; s += ut.m_MData.u.Ext.szUnit2;
     s += "\",\"u3\":\"\"";
   }
-  else if(ut.m_MData.Switch==4&&ut.m_MData.Select==2)
+  else if(ut.m_MData.Switch==4 && ut.m_MData.Select > 1) // temp C or F
   {
     fixDeg(ut.m_MData.u.Std.szUnit);
     s += ",\"u1\":\""; s += ut.m_MData.u.Std.szUnit;
     s += "\",\"u2\":\"";
-    if(ut.m_MData.tempReverse || ut.m_MData.tempSubReverse)
+    if(ut.m_MData.Mode >= 3) // subtractive shows both
       s += ut.m_MData.u.Std.szUnit;
     s += "\",\"u3\":\"\"";
   }
@@ -311,20 +306,20 @@ String rangesJson() // get range and select options for dropdowns
       s += ",\"l2\":\"Measurement:\"";
       s += ",\"l3\":\"\"";
   }
-  else if(ut.m_MData.Switch==4 && ut.m_MData.Select==2) // Temp
+  else if(ut.m_MData.Switch==4 && ut.m_MData.Select > 1) // Temp C or F
   {
       s += ",\"l0\":\"\"";
-      if(ut.m_MData.tempSubReverse)
+      if(ut.m_MData.Mode >= 3) // subtractive
       {
-        s += ",\"l1\":\"T2\"";
-        s += ",\"l2\":\"T1\"";
+        s += ",\"l1\":\"T1\"";
+        s += ",\"l2\":\"T2\"";
       }
-      else if(ut.m_MData.tempReverse)
+      else if(ut.m_MData.Mode == 2) // reverse
       {
         s += ",\"l1\":\"T1\"";
         s += ",\"l2\":\"\"";
       }
-      else
+      else // normal
       {
         s += ",\"l1\":\"T2\"";
         s += ",\"l2\":\"\"";
@@ -783,7 +778,7 @@ void sendBinData(uint8_t *p, int len)
 
 void loop()
 {
-  static uint8_t hour_save, sec_save;
+  static uint8_t hour_save, sec_save, lastS;
   static uint8_t cnt;
   time_t nw;
 
@@ -794,11 +789,18 @@ void loop()
   utime.check(ee.tz);
 
   nw = now();
+  int s = second(nw);
+  if(s !=lastS)
+  {
+    lastS = s;
+    tick = 0;
+  }
   ut.service(nw); // read serial data
 
   if(ut.Updated()) // new packet ready
   {
     ws.textAll(dataJson());
+    tick++;
   }
   // only update the extras when settings change
   if(oldOpt != *(uint32_t*)(&ut.m_MData))
@@ -807,7 +809,6 @@ void loop()
     ws.textAll(rangesJson());
   }
 
-  int s = second(nw);
   if(sec_save != s) // only do stuff once per second
   {
     sec_save = s;
@@ -826,7 +827,7 @@ void loop()
     {
       connTime = 5;
       if(ut.m_bConnected == false)
-        ut.Connect(true);
+        ut.start(true);
     }
   }
 
