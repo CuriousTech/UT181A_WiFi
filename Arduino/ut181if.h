@@ -9,7 +9,7 @@ enum UT_CMD{
   CMD_SET_RANGE,
   CMD_SET_REL,
   CMD_SET_MINMAX,
-  CMD_CONNECT,
+  CMD_CONT_DATA,
   CMD_SAVE,
   CMD_GET_SAVE,
   CMD_GET_SAVE_COUNT,
@@ -21,7 +21,7 @@ enum UT_CMD{
   CMD_GET_RECORD_COUNT,
   CMD_DELETE_RECORD_ITEM,
   CMD_SET_CLOCK,
-  CMD_11,
+  CMD_QUERY_MODEL,
   CMD_HOLD,
 };
 
@@ -174,7 +174,7 @@ union UData
 
 struct MData
 {
-  uint8_t  _T1:1;
+  uint8_t  MinMax2:1;
   uint8_t  dataType:3;
   uint8_t  Rel:1;
   uint8_t  MinMax:1;
@@ -182,21 +182,19 @@ struct MData
   uint8_t  Hold:1;   // byte 0
 
   uint8_t  Auto:1;   // byte 1
-  uint8_t  Over:1;   // byte 1
+  uint8_t  Over:1;
   uint8_t  Unk1:1;
   uint8_t  LeadErr:1;
   uint8_t  Comp:1;
   uint8_t  Recording:1;
   uint8_t  Unk2:2;   // byte 1
 
-  uint8_t  Unk3:5; // byte 2
-  uint8_t  tempReverse:1;
-  uint8_t  Unk4:1;
-  uint8_t  tempSubReverse:1;
+  uint8_t  Unk3:4; // byte 2
+  uint8_t  Mode:4;
   uint8_t  Select:4; // byte 3
   uint8_t  Switch:4; // byte 3
   uint8_t  Range:4;  // byte 4
-  uint8_t  nUnk:4;   // byte 4
+  uint8_t  nUnk4:4;   // byte 4
   MValue   Value;    // 5 bytes
   UData    u;        // union based on dataType
 };
@@ -218,12 +216,21 @@ struct recCmd
 
 #pragma pack(pop)
 
+enum RXID{
+  RX_ACK = 1,
+  RX_MDATA,
+  RX_SAVE_ENT,
+  RX_REC_ENT,
+  RX_REC_DATA,
+  RX_REC_CNT = 0x72
+};
+
 class UT181Interface
 {
 public:
   UT181Interface(){};
   void service(time_t nw);
-  void Connect(bool bCon);
+  void start(bool bCont);
   bool Updated(void);
   bool WriteData(uint8_t *pData, int len);
   String convertDate(uniDate &dt);
@@ -249,7 +256,8 @@ public:
   int readPercent(void);
   void deleteSave(int nItem);
   void deleteRecord(int nItem);
-  void setClock();
+  void setClock(void);
+  void QueryModel(void);
 private:
   uint16_t getWord(uint8_t *p);
   uint16_t sum(uint8_t *p, uint16_t len);
@@ -279,6 +287,8 @@ private:
   int      m_nRecDataIndex;
   uint32_t m_keepAlive;
   char     m_szRecUnit[12];
+  char     m_szModel[12];
+  char     m_szSerial[32];
 public:
   MData    m_MData;
   bool     m_bConnected;
