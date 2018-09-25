@@ -92,7 +92,7 @@ void UT181Interface::process_sentence(uint16_t len)
   sendBinData(m_buffer, len);
   switch(m_buffer[0])
   {
-    case 0x01:  // 1 = command respsonses
+    case RX_ACK:  // 1 = command respsonses
           // 01 4F 4B A0 = 'OK '
           // 01 45 52 9D = 'ER'
           // 01 49 4E 56 = 'INV'
@@ -106,12 +106,12 @@ void UT181Interface::process_sentence(uint16_t len)
         getRecordData();
       }
       break;
-    case 0x02: // main meter data
+    case RX_MDATA: // main meter data
       m_bConnected = true;
       memcpy(&m_MData, m_buffer + 1, sizeof(MData));
       m_Updated++;
       break;
-    case 0x03: // save entry
+    case RX_SAVE_ENT: // save entry
       if(m_nRecIdx >= m_nSaves)
       {
         m_nRecReq = 0; // too many
@@ -124,11 +124,11 @@ void UT181Interface::process_sentence(uint16_t len)
       else // finished
       {
         m_nRecReq = 0;
-        Connect(true);
+        start(true);
       }
       break;
 
-    case 0x04: // record entry
+    case RX_REC_ENT: // record entry
       if(m_nRecIdx >= m_nRecords)
       {
         m_nRecReq = 0;
@@ -144,10 +144,10 @@ void UT181Interface::process_sentence(uint16_t len)
       else // end, reconnect
       {
         m_nRecReq = 0;
-        Connect(true);
+        start(true);
       }
       break;
-    case 0x05: // record data
+    case RX_REC_DATA: // record data
       decodeSamples(m_buffer + 2, m_buffer[1]); // first byte is count
       m_nRecDataIndex += m_buffer[1];
       if(m_nRecDataIndex < m_nRecDataIndexEnd)
@@ -157,24 +157,28 @@ void UT181Interface::process_sentence(uint16_t len)
       else // end of record, restart
       {
         m_nRecordItem = 0;
-        Connect(true);
+        start(true);
         WsSend("finish;0");
       }
       break;
-    case 0x72:  // number of saves/records
+    case RX_REC_CNT:  // number of saves/records, model
       switch(m_buffer[1])
       {
-        case 0x08: // saves
-          m_nSaves = getWord(m_buffer + 2); // 72 08 03 00 83
-          Connect(false); // disable to read
+        case CMD_GET_SAVE_COUNT: // saves
+          m_nSaves = getWord(m_buffer + 2);
+          start(false); // disable to read
           m_nRecReq = 1; // setup to start on next ack
           m_nRecIdx = 0;
           break;
-        case 0x0E: // records
-          m_nRecords = getWord(m_buffer + 2); // 72 0E 02 00 88
-          Connect(false); // disable main data to read
+        case CMD_GET_RECORD_COUNT: // records
+          m_nRecords = getWord(m_buffer + 2);
+          start(false); // disable main data to read
           m_nRecReq = 2;
           m_nRecIdx = 0;
+          break;
+        case CMD_QUERY_MODEL:
+          strcpy(m_szModel, (char *)m_buffer + 2);
+          strcpy(m_szSerial, (char *)m_buffer + 13);
           break;
       }
       break;
@@ -196,19 +200,19 @@ void UT181Interface::startRecordRetreval(int nItem, char *pszUnit, uint32_t dwSa
   m_nRecDataIndex = 0;
   m_nRecDataIndexEnd = dwSamples;
   m_bGetRecStart = true;
-  Connect(false);
+  start(false);
   m_nRecordItem = nItem + 1;
 }
 
-void UT181Interface::Connect(bool bCon) // start/stop meter data transmit
+void UT181Interface::start(bool bCont) // start/stop meter data transmit, or single
 {
-  static uint8_t cmd[]= {CMD_CONNECT,0x00};
+  static uint8_t cmd[]= {CMD_CONT_DATA, 0x00};
 
   if( m_nRecReq || m_nRecordItem) // in download mode
     return;
-  if(!bCon)  m_bConnected = false;
+  if(!bCont)  m_bConnected = false;
 
-  cmd[1] = bCon ? 1 : 0;
+  cmd[1] = bCont ? 1 : 0;
   Write(cmd, sizeof(cmd) );
 }
 
@@ -254,11 +258,9 @@ bool UT181Interface::Write(uint8_t *p, uint8_t len)
 // Select and REL + rel value
 void UT181Interface::SetSelect(uint8_t nSel, uint8_t nOpt, bool bRel, float fValue)
 {
-  uint8_t cmd[]= {CMD_SET_OPTION,0, (m_MData.Switch << 4) | nSel};
+  uint8_t cmd[]= {CMD_SET_OPTION, ((nOpt + 1) << 4) | (bRel ? 2:1), (m_MData.Switch << 4) | nSel};
 
-  cmd[1] = ((nOpt + 1) << 4) | (bRel ? 2:1);
-
-  if(cmd[2] == 0x52 || cmd[2] == 0x61) // sub mode
+  if(cmd[2] == 0x52 || cmd[2] == 0x61) // mode for cont, diode
   {
     cmd[1] = 0x10 | (nOpt + 1);
   }
@@ -287,22 +289,20 @@ float UT181Interface::GetfValue()
 
 void UT181Interface::SetRange(uint8_t n)  // 0 = auto, 1 = range 1...8
 {
-  static uint8_t cmd[]= {CMD_SET_RANGE,0x00};
+  static uint8_t cmd[]= {CMD_SET_RANGE, n};
 
-  cmd[1] = n;
   Write(cmd, sizeof(cmd) );
 }
 
 void UT181Interface::Hold()
 {
-  static uint8_t cmd[]= {CMD_HOLD,0x5A}; // Z
+  static uint8_t cmd[]= {CMD_HOLD, 0x5A}; // Z
   Write(cmd, sizeof(cmd) );
 }
 
 void UT181Interface::MinMax() // toggle
 {
-  static uint8_t cmd[]= {CMD_SET_MINMAX,0x00};
-  cmd[1] = m_MData.MinMax ? 0:1;
+  static uint8_t cmd[]= {CMD_SET_MINMAX, m_MData.MinMax ? 0:1};
   Write(cmd, sizeof(cmd) );
 }
 
@@ -314,7 +314,7 @@ void UT181Interface::GetRecordSeq() // get next record or save (redundant?)
       if(m_nRecIdx > m_nSaves)
       {
         m_nRecReq = 0;
-        Connect(true);
+        start(true);
       }
       else
         getSave(m_nRecIdx+1);
@@ -323,7 +323,7 @@ void UT181Interface::GetRecordSeq() // get next record or save (redundant?)
       if(m_nRecIdx > m_nRecords)
       {
         m_nRecReq = 0;
-        Connect(true);
+        start(true);
       }
       else
         getRecord(m_nRecIdx+1);
@@ -333,10 +333,8 @@ void UT181Interface::GetRecordSeq() // get next record or save (redundant?)
 
 void UT181Interface::getRecord(uint16_t nItem) // get a record entry
 {
-  uint8_t cmd[]= {CMD_GET_RECORD, 0, 0};
+  uint8_t cmd[]= {CMD_GET_RECORD, nItem & 0xFF, nItem >> 8};
 
-  cmd[1] = nItem & 0xFF;
-  cmd[2] = nItem >> 8;
   Write(cmd, sizeof(cmd) );
 }
 
@@ -403,10 +401,8 @@ void UT181Interface::StopRecord()
 
 void UT181Interface::getSave(uint16_t nItem)
 {
-  uint8_t cmd[]= {CMD_GET_SAVE, 0, 0};
+  uint8_t cmd[]= {CMD_GET_SAVE, nItem & 0xFF, nItem >> 8};
 
-  cmd[1] = nItem & 0xFF;
-  cmd[2] = nItem >> 8;
   Write(cmd, sizeof(cmd) );
 }
 
@@ -426,20 +422,14 @@ void UT181Interface::DeleteAllSave() // Saves
 
 void UT181Interface::deleteSave(int nItem)
 {
-  static uint8_t cmd[]= {CMD_DELETE_SAVE_ITEM, 0, 0};
-
-  cmd[1] = nItem & 0xFF;
-  cmd[2] = nItem >> 8;
+  static uint8_t cmd[]= {CMD_DELETE_SAVE_ITEM, nItem & 0xFF, nItem >> 8};
 
   Write(cmd, sizeof(cmd) );
 }
 
 void UT181Interface::deleteRecord(int nItem)
 {
-  static uint8_t cmd[]= {CMD_DELETE_RECORD_ITEM, 0, 0};
-
-  cmd[1] = nItem & 0xFF;
-  cmd[2] = nItem >> 8;
+  static uint8_t cmd[]= {CMD_DELETE_RECORD_ITEM, nItem & 0xFF, nItem >> 8};
 
   Write(cmd, sizeof(cmd) );
 }
@@ -505,6 +495,13 @@ void UT181Interface::setClock()
     ee.updateTime = cmd.ud.dw;
     Write((uint8_t*)&cmd, sizeof(cmd) );
   }
+}
+
+void UT181Interface::QueryModel()
+{
+  static uint8_t cmd[]= {CMD_QUERY_MODEL};
+
+  Write((uint8_t*)&cmd, sizeof(cmd) );
 }
 
 int UT181Interface::readPercent()
@@ -726,7 +723,6 @@ uint16_t UT181Interface::StatusBits()
   if(m_MData.LeadErr) bits |= (1<<9);
   if(m_MData.Rel)     bits |= (1<<10);
   if(m_MData.MinMax)  bits |= (1<<11);
-  if(m_MData._T1)     bits |= (1<<12);
 
   return bits;
 }
