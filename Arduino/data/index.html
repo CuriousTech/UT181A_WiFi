@@ -35,7 +35,7 @@ body{width:340px;font-family: Arial, Helvetica, sans-serif; overflow:hidden;}
     background-color: #50a0ff;
     padding: 1px;
     font-size: 12px;
-    min-width: 56px;
+    min-width: 50px;
     border: none;
 }
 .dropdown-content {
@@ -43,7 +43,7 @@ body{width:340px;font-family: Arial, Helvetica, sans-serif; overflow:hidden;}
     position: absolute;
     background-color: #919191;
     min-width: 60px;
-    min-height: 120px;
+    min-height: 10px;
     z-index: 1;
 }
 .dropdown:hover .dropdown-content {display: block;}
@@ -52,6 +52,8 @@ body{width:340px;font-family: Arial, Helvetica, sans-serif; overflow:hidden;}
 #rec{
 opacity:.9;
 display:none;
+top:300px;
+left:150px;
 position:absolute;
 background-color:#A13131;
 overflow:auto;
@@ -79,22 +81,26 @@ ws.onmessage=function(evt){
  d=JSON.parse(data)
  oledon=d.o
  a.OLED.value=oledon?'ON ':'OFF'
+ rate=d.r
+ showRate()
  }
  else if(event == 'state')
  {
 	d=JSON.parse(data)
 	dt=new Date(d.t*1000)
-	a.time.innerHTML=dt.toLocaleTimeString()
+	a.time.innerHTML=dt.toLocaleTimeString()+'.'+d.tk
 	a.value.innerHTML=d.v
 	a.unit.innerHTML=fixLabel(d.u)
-	a.v1.innerHTML=d.v1
+	a.v1.innerHTML=(typeof(d.v1)!='undefined')?d.v1:''
 	if(d.st&(1<<6))
 		a.v1.setAttribute('style',d.v1=='FAIL'?'color:red':'color:green')
-	a.v2.innerHTML=d.v2
-	a.v3.innerHTML=d.v3
+	a.v2.innerHTML=(typeof(d.v2)!='undefined')?d.v2:''
+	a.v3.innerHTML=(typeof(d.v3)!='undefined')?d.v3:''
 	v=+d.v
-	aa=[dt,v,+d.v1,+d.v2,+d.v3]
-	va.push(aa)
+	if(+d.a){
+	 aa=[dt,v,+d.v1,+d.v2,+d.v3]
+	 va.push(aa)
+	}
 	min=+d.mn
 	max=+d.mx
 	mod=+d.md
@@ -108,9 +114,9 @@ ws.onmessage=function(evt){
 	if(st!=lastst){
 		a.am.innerHTML=(st&(1<<4))?"AUTO":"MANUAL"
 		a.h.innerHTML=(st&(1<<5))?"HOLD":""
-		if(st&(1<<2)) document.getElementById('imag').src = 'diode.png'
-		else if(st&(1<<1)) document.getElementById('imag').src = 'beep.png'
-		else document.getElementById('imag').src = ''
+		if(st&(1<<2)) a.imag.src = 'diode.png'
+		else if(st&(1<<1)) a.imag.src = 'beep.png'
+		else a.imag.src = ''
 		a.record.value=(st&(1<<8))?"Stop":"Record"
 		recording=(st&(1<<8))?true:false
 		lastst=st
@@ -131,18 +137,27 @@ ws.onmessage=function(evt){
  }
  else if(event == 'print')
  {
+  a.status.innerHTML=data
   console.log(data)
  }
  else if(event == 'range')
  {
+  a.status.innerHTML=''
+  va=[]
   d=JSON.parse(data)
-  for(i=0;i<8;i++){
+  for(i=0;i<3;i++){
+   item=document.getElementById('s'+i)
+   item.setAttribute('style',i<d.s.length?'':'display:none')
+//   if(i==idx) item.setAttribute('style','background-color:red')
+   item.innerHTML=d.s[i]
+  }
+  for(i=0;i<9;i++){
    item=document.getElementById('r'+i)
    item.setAttribute('style',i<d.r.length?'':'display:none')
 //   if(i==idx) item.setAttribute('style','background-color:red')
    item.innerHTML=d.r[i]
   }
-  for(i=0;i<5;i++){
+  for(i=0;i<6;i++){
    item=document.getElementById('o'+i)
    item.setAttribute('style',i<d.o.length?'':'display:none')
 //   if(i==idx) item.setAttribute('style','background-color:red')
@@ -186,11 +201,15 @@ function setVar(varName, value)
 }
 function setA(n)
 {
- setVar('range', n)
+ setVar('range',n)
+}
+function setSel(n)
+{
+ setVar('sel',n)
 }
 function setOpt(n)
 {
- setVar('sel', n)
+ setVar('opt',n)
 }
 function oled(){
 oledon=!oledon
@@ -271,7 +290,8 @@ try {
 	ctx.lineWidth=1
 	ctx.font="bold 10px sans-serif"
 	ctx.textAlign="right"
-	h=c.height-20
+	bd=10
+	h=c.height-60
 	if(min<0){
 		base=h/2
 		range=h/2
@@ -279,11 +299,11 @@ try {
 		base=h
 		range=h
 	}
-	base+=10
+	base+=bd
 	fVal=min
 	for(i=6;i>=0;i--)
 	{
-		y=(i/6*h)+10
+		y=(i/6*h)+bd
 		ctx.strokeStyle="#FFF"
 		ctx.fillText(fVal,20,y+3)
 		fVal+=(max-min)/6
@@ -296,15 +316,20 @@ try {
 
 	ctx.strokeStyle = "#555"
 	m=0
+	ctx.font="10px sans-serif"
 	for(i=1,x=21;i<va.length;i++,x++)
 	{
-		if(va[i][0].getSeconds()==0&&va[i][0].getMinutes()!=m)
+		if(x%100==21)
 		{
 			ctx.beginPath()
-		    ctx.moveTo(x,h+10)
-		    ctx.lineTo(x,10)
+		    ctx.moveTo(x,h+bd)
+		    ctx.lineTo(x,bd)
 			ctx.stroke()
-			m=va[i][0].getMinutes()
+			ctx.save()
+			ctx.translate(x+30, h+60)
+			ctx.rotate(0.9)
+			ctx.fillText(va[i][0].toLocaleTimeString(),0,0)
+			ctx.restore()
 		}
 	}
 
@@ -312,16 +337,19 @@ try {
 	colors=[0,'#FFF','#00F','#0F0','#FF0','#0FF']
 	for(line=4;line>0;line--)
 	{
-		y=base-(va[0][line]/ciel*range)
-		ctx.strokeStyle = colors[line]
-		ctx.beginPath()
-	    ctx.moveTo(20,y)
-		for(i=1,x=21;i<va.length;i++,x++)
+		start=0
+		ctx.strokeStyle=colors[line]
+		for(i=0,x=21;i<va.length;i++,x++)
 		{
-			y=base-(va[i][line]/ciel*range)
-		    ctx.lineTo(x,y)
+			if(typeof(va[i][line])!='undefined'){
+				v0=va[i][line]
+				y=base-(v0/ciel*range)
+				if(!start){start=1;ctx.beginPath();ctx.moveTo(20,y)}
+				else if(start) ctx.lineTo(x,y)
+			}
+			else if(start){ctx.stroke();start=0;}
 		}
-		ctx.stroke()
+		if(start)ctx.stroke()
 	}
 }catch(err){}
 }
@@ -346,19 +374,34 @@ function cancelRec()
 }
 function chgRate()
 {
- rates=['100ms','200ms','500ms','1 sec','2 sec','5 sec','10sec','30sec',' 1 min']
  if(++rate>8) rate=0
- a.rate.value=rates[rate]
  setVar('rate',rate)
+ showRate()
+}
+function showRate(){
+ rates=['100ms','200ms','500ms','1 sec','2 sec','5 sec','10sec','30sec',' 1 min']
+ a.rate.value=rates[rate]
+}
+function trueValue(val,Unit)
+{
+ switch(Unit.charAt(0))
+ {
+	case 'k': scl=1000;break
+	case 'M': scl=1000000;break
+	case 'm': scl=0.001;break
+	case 'u': scl=0.000001;break
+	case 'n': scl=0.000000001;break
+	default: scl=1;break
+ }
+ return val*scl
 }
 
 </script>
 <body bgcolor="black" text="silver"  onload="{startWS()}">
-<div><h3 align="center">WiFi UT181A</h3>
-
+<div>
 <table align=center width=360>
-<tr align=center><td colspan=2><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td width=70></td><td></td></tr>
-<tr align=center><td width=50><td><div id="mm" width=70></div></td><td width=50><div id="h"></div></td><td width=70><div id="am">AUTO</div></td></tr>
+<tr align=center><td colspan=2><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td colspan=2><div style="font-size:large">WiFi UT181A</div></td></tr>
+<tr align=center><td width=50><td><div id="mm" width=60></div></td><td width=50><div id="h"></div></td><td width=70><div id="am">AUTO</div></td></tr>
 </table>
 <table align=center width=360>
 <tr align=center><td width=150 align="right" colspan=2><div id="value" style="font-size:xx-large">0L</div></td><td><div id="unit">DCV</div></td>
@@ -368,15 +411,13 @@ function chgRate()
 <tr><td><div id="l2"></div></td><td><div id="v2"></div></td><td><div id="u2"></div></td><td align="right"><div id="t2"></div></td></tr>
 <tr><td><div id="l3"></div></td><td><div id="v3"></div></td><td><div id="u3"></div></td><td align="right"><div id="t3"></div></td></tr>
 <tr><td colspan=4><input type="button" value="Hold" id="hold" onClick="{setVar('hold', 0)}">
-<div id="rec"><div id="popupRec">
-<h2>Record</h2>
-<table width="100">
-<tr><td>Name: <input id="name" name="name" placeholder="REC_1" type="text" size="10"></td></tr>
-<tr><td>Interval:<input id="interval" name="interval" placeholder="1" type="text" size="10"></td></tr>
-<tr><td>Duration:<input id="duration" name="duration" placeholder="60" type="text" size="10"></td></tr>
-<tr><td><input type="button" id="close" value="Cancel" onclick ="cancelRec()"><input type="button" id="start" value="Start" onclick ="startRec()"></td></tr>
-</table>
-</div>
+<div class="dropdown">
+  <button class="dropbtn">Select</button>
+  <div class="dropdown-content">
+  <button class="btn" id="s0" onclick="setSel(1)">Ohms</button>
+  <button class="btn" id="s1" onclick="setSel(2)">Beep</button>
+  <button class="btn" id="s2" onclick="setSel(3)">nS</button>
+  </div>
 </div>
 <div class="dropdown">
   <button class="dropbtn">Range</button>
@@ -404,15 +445,25 @@ function chgRate()
   </div>
 </div>
 <input type="button" value="REL" id="REL" onClick="{setVar('rel', 0)}">
-<input id='rval' type=text size=4 value='0'> &nbsp<input type="button" value="M/M" id="M/M" onClick="{setVar('mm', 0)}"> <input type="button" value="100ms" id="rate" onClick="{chgRate()}"></td></tr>
-<tr><td colspan=4></td></tr>
-<tr><td colspan=4><canvas id="chart" width="360" height="300" style="float:center"></td></tr>
-<tr><td colspan=4>&nbsp </td></tr>
-<tr><td width="95">OLED:<input type="button" value="ON" id="OLED" onClick="{oled()}"></td>
-<td width="110"><input type="button" value="Save" onClick="{setVar('sav', 0)}"> <input type="button" id="record" value="Record" onClick="{openRec()}">
-</td><td><input type="submit" value="Files" onClick="window.location='/files.html';"></td><td><input type="submit" value="Setup" onClick="window.location='/s';"></td></tr>
+<input id='rval' type=text size=4 value='0'> &nbsp<input type="button" value="M/M" id="M/M" onClick="{setVar('mm', 0)}"></td></tr>
+<tr><td colspan=4><canvas id="chart" width="360" height="360" style="float:center"></td></tr>
+<tr><td colspan=4><div id="rec"><div id="popupRec">
+<h2>Record</h2>
+<table width="100">
+<tr><td>Name: <input id="name" name="name" placeholder="REC_1" type="text" size="10"></td></tr>
+<tr><td>Interval:<input id="interval" name="interval" placeholder="1" type="text" size="10"></td></tr>
+<tr><td>Duration:<input id="duration" name="duration" placeholder="60" type="text" size="10"></td></tr>
+<tr><td><input type="button" id="close" value="Cancel" onclick ="cancelRec()"><input type="button" id="start" value="Start" onclick ="startRec()"></td></tr>
 </table>
-&nbsp
+</div>
+</div>
+</td>
+</tr>
+<tr><td colspan=4> <div id="status"></div></td></tr>
+<tr><td colspan=4">OLED<input type="button" value="OFF" id="OLED" onClick="{oled()}"><input type="button" value="Save" onClick="{setVar('sav', 0)}">
+<input type="button" id="record" value="Record" onClick="{openRec()}"><input type="submit" value="Files" onClick="window.location='/files.html';">
+<input type="button" value="100ms" id="rate" onClick="{chgRate()}"> <input type="submit" value="Setup" onClick="window.location='/s';"></td></tr>
+</table>
 </div>
 </body>
 </html>
