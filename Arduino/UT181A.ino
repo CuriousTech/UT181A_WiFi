@@ -94,7 +94,7 @@ String timeFmt(uint32_t val) // convert seconds to hh:mm:ss
   return st;
 }
 
-String dataJson() // main meter data 10Hz,5Hz,2Hz
+String dataJson() // main meter data 10Hz
 {
   int nMin, nMax, nMod;
   ut.RangeMod(nMin, nMax, nMod);
@@ -103,6 +103,11 @@ String dataJson() // main meter data 10Hz,5Hz,2Hz
   s += "\"t\":";    s += now() - ( (ee.tz + utime.getDST() ) * 3600);
   s += ",\"tk\":";  s += tick;
   s += ",\"v\":\""; s += ut.ValueText(0); // primary value
+  s += "\",\"bv\":\"";
+  if(ut.m_MData.Rel)
+    s += ut.m_MData.u.Ext.Value3.fValue;
+  else
+    s += ut.m_MData.u.Std.fBarValue; // 10Hz bar value
   s += "\",\"u\":\""; s += ut.UnitText(); // unit of measurement
   if(ut.m_MData.Recording) // recording timer
   {
@@ -269,7 +274,7 @@ String rangesJson() // get range and select options for dropdowns
       s += ut.m_MData.u.Std.szUnit;
     s += "\",\"u3\":\"\"";
   }
-  else if(ut.m_MData.dataType == 1)
+  else if(ut.m_MData.Ext)
   {
     fixDeg(ut.m_MData.u.Ext.szUnit1);
     fixDeg(ut.m_MData.u.Ext.szUnit2);
@@ -520,26 +525,23 @@ void sendSaveEntry(SaveRec *pRec)
   s += ut.ValueText(pRec->Value0);
   s += "\"],[\"";
 
-  switch(pRec->switchSel)
+  if(pRec->MinMax2)
   {
-    case 0x08:
+      fixDeg(pRec->u.b.szLabel);
+      s += pRec->u.b.szLabel;
+      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value21);
+      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value22);
+      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value23);
+      s += "\"]]";
+  }
+  else if( !pRec->Ext) // normal
+  {
       fixDeg(pRec->u.a.szLabel0);
       s += pRec->u.a.szLabel0;
-      s += "\"]]";
-      break;
-    case 0x02:
-    case 0x0A:
-    case 0x42:
-      fixDeg(pRec->u.a.szLabel1);
-      fixDeg(pRec->u.a.szLabel2);
-      s += pRec->u.a.szLabel1;
-      s += "\"],[\""; s += ut.ValueText(pRec->u.a.Value11);
-      s += "\"],[\""; s += pRec->u.a.szLabel2;
-      s += "\"]]";
-      break;
-    case 0x06:
-    case 0x0E:
-    case 0x1E:
+      s += "\"]]";    
+  }
+  else if(pRec->Triple) // 3 values
+  {
       fixDeg(pRec->u.a.szLabel0);
       fixDeg(pRec->u.a.szLabel1);
       fixDeg(pRec->u.a.szLabel2);
@@ -548,17 +550,16 @@ void sendSaveEntry(SaveRec *pRec)
       s += "\"],[\""; s += pRec->u.a.szLabel1;
       s += "\"],[\""; s += ut.ValueText(pRec->u.a.Value12);
       s += "\"],[\""; s += pRec->u.a.szLabel2;
+      s += "\"]]";    
+  }
+  else // 2 values
+  {
+      fixDeg(pRec->u.a.szLabel1);
+      fixDeg(pRec->u.a.szLabel2);
+      s += pRec->u.a.szLabel1;
+      s += "\"],[\""; s += ut.ValueText(pRec->u.a.Value11);
+      s += "\"],[\""; s += pRec->u.a.szLabel2;
       s += "\"]]";
-      break;
-    case 0x27:
-    case 0x2F:
-      fixDeg(pRec->u.b.szLabel);
-      s += pRec->u.b.szLabel;
-      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value21);
-      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value22);
-      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value23);
-      s += "\"]]";
-      break;
   }
 
   s += "}";
