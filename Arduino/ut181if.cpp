@@ -166,12 +166,16 @@ void UT181Interface::process_sentence(uint16_t len)
       {
         case CMD_GET_SAVE_COUNT: // saves
           m_nSaves = getWord(m_buffer + 2);
+          if(m_nSaves == 0)
+            break;
           start(false); // disable to read
           m_nRecReq = 1; // setup to start on next ack
           m_nRecIdx = 0;
           break;
         case CMD_GET_RECORD_COUNT: // records
           m_nRecords = getWord(m_buffer + 2);
+          if(m_nRecords == 0)
+            break;
           start(false); // disable main data to read
           m_nRecReq = 2;
           m_nRecIdx = 0;
@@ -514,18 +518,15 @@ int UT181Interface::DisplayCnt()
   if(m_MData.MinMax)  return 4;
   if(m_MData.Rel)     return 3;
   if(m_MData.Peak)    return 2;
-
-  switch(m_MData.dataType)
+  if(m_MData.Comp)
   {
-      case 0x5:// dbV
-      case 0x1: // T1
-        return 2;
-      case 0x3: // T1-T2 // Todo: fix data for mVac+dc
-      case 0x7: // Hz Ms
-        return 3;
-      default: // 0x4
-        return 1;
-    }
+    return (m_MData.u.Comp.CompMode > 1) ? 3:2;
+  }
+  if(m_MData.Norm && m_MData.Triple && m_MData.Ext) return 3;
+  if(m_MData.Norm && m_MData.Ext) return 2;
+  if(m_MData.Triple && m_MData.Ext) return 3;
+  if(m_MData.Ext) return 2;
+  return 1;
 }
 
 char *UT181Interface::UnitText()
@@ -644,18 +645,15 @@ void UT181Interface::RangeMod(int &nMin, int &nMax, int &nMod)
   if(nMax == 1000)
     nMod = 12;
 
-  if(m_MData.Peak || m_MData.MinMax) // no bar
+  if(m_MData.Peak) // no bar
     nMod = 0;
 
-  switch(m_MData.dataType) // no bar modes
-  {
-    case 0x1: // T1
-      nMod = 0;
-    case 0x3: // T1-T2
+  if(m_MData.Ext) // temp?
+    nMod = 0;
+
+  if(m_MData.Norm)
       if(m_MData.Switch == eSwitch_mVDC)
         nMod = 0;
-      break;
-  }
 }
 
 void UT181Interface::getSign()
