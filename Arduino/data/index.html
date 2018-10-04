@@ -65,7 +65,7 @@ a=document.all
 oledon=0;v=0;min=-60;max=60;mod=5;st=0;lastst=0;rate=0
 va=new Array()
 function startWS(){
-draw_bar(0)
+draw_bar(0,false)
 draw_chart()
 ws=new WebSocket("ws://"+window.location.host+"/ws")
 //ws=new WebSocket("ws://192.168.0.109/ws")
@@ -96,9 +96,8 @@ ws.onmessage=function(evt){
 		a.v1.setAttribute('style',d.v1=='FAIL'?'color:red':'color:green')
 	a.v2.innerHTML=(typeof(d.v2)!='undefined')?d.v2:''
 	a.v3.innerHTML=(typeof(d.v3)!='undefined')?d.v3:''
-	v=+d.v
 	if(+d.a){
-	 aa=[dt,v,+d.v1,+d.v2,+d.v3]
+	 aa=[dt,d.v,+d.v1,+d.v2,+d.v3]
 	 va.push(aa)
 	}
 	min=+d.mn
@@ -107,7 +106,7 @@ ws.onmessage=function(evt){
 	st=+d.st
 	if(mod){
 		a.bar.setAttribute('style','')
-		draw_bar(d.v=='0L'?1:0)
+		draw_bar(d.bv, d.v=='0L'?true:false)
 	}else a.bar.setAttribute('style','display:none')
 	draw_chart()
 
@@ -217,7 +216,7 @@ setVar('oled', oledon)
 a.OLED.value=oledon?'ON ':'OFF'
 }
 
-function draw_bar(zl){
+function draw_bar(v,zl){
 try {
 	var c2 = document.getElementById('bar')
 	ctx = c2.getContext("2d")
@@ -271,7 +270,7 @@ try {
 	else // unsigned
 	{
 		x = v/max*w
-		if(x>w) x=w
+		if(x>w || zl) x=w
 		ctx.fillStyle = "#FFF";
 		ctx.fillRect(12, 30, x, 6);
 		ctx.fillStyle = "#F00";
