@@ -39,6 +39,15 @@ enum eSwitch{
   eSwitch_A,
 };
 
+enum RXID{
+  RX_ACK = 1,
+  RX_MDATA,
+  RX_SAVE_ENT,
+  RX_REC_ENT,
+  RX_REC_DATA,
+  RX_REC_CNT = 0x72
+};
+
 #pragma pack(push, 1)
 
 struct uniDate{
@@ -85,13 +94,30 @@ struct Record
 
 struct SaveRec
 {
-  uniDate Date;
-  uint8_t switchSel;
-  uint8_t Unk[2];
-  uint8_t Switch:4;
+  uniDate Date; // 4 bytes
+  uint8_t MinMax2:1; // 5 bytes...
+  uint8_t Ext:1;
+  uint8_t Triple:1;
+  uint8_t Norm:1;
+  uint8_t Rel:1;
+  uint8_t MinMax:1;
+  uint8_t Peak:1;
+  uint8_t Hold:1;
+  uint8_t Auto:1;
+  uint8_t Over:1;
+  uint8_t Unk1:1;
+  uint8_t LeadError:1;
+  uint8_t Comp:1;
+  uint8_t Recording:1;
+  uint8_t Unk2:2;
+  uint8_t Beeper:2;
+  uint8_t Unk3:2;
+  uint8_t Mode:4;
   uint8_t Select:4;
-  uint8_t Range;
-  MValue Value0;
+  uint8_t Switch:4;
+  uint8_t Range:4;
+  uint8_t pad:4;
+  MValue Value0; // 5 bytes
 
   union tag_u
   {
@@ -123,19 +149,22 @@ union UData
 {
   struct
   {
-    char  szUnit[8];
-    uint8_t Unk[4];
-    char  szUnit2[8];
-    char  pad1[26];
+    char    szUnit[8];
+    float   fBarValue;
+    char    szUnit2[8];
+    char    pad1[26];
   } Std; // 20
   struct // Comp mode
   {
     char    szUnit[8];
-    uint8_t Unk[4];
+    float   fBarValue;
     char    szUnit2[8];
-    uint8_t CompMode:4;
-    uint8_t BeepMode:4;
-    uint8_t Fail;
+    uint8_t CompMode:2;
+    uint8_t Unk1:1;
+    uint8_t BeepMode:3;
+    uint8_t Unk2:2;
+    uint8_t Fail:1;
+    uint8_t Unk3:7;
     uint8_t Precision;
     float   fHigh;
     float   fLow;
@@ -175,7 +204,9 @@ union UData
 struct MData
 {
   uint8_t  MinMax2:1;
-  uint8_t  dataType:3;
+  uint8_t  Ext:1; // 4 value
+  uint8_t  Triple:1; // 3 value
+  uint8_t  Norm:1;
   uint8_t  Rel:1;
   uint8_t  MinMax:1;
   uint8_t  Peak:1;
@@ -188,15 +219,15 @@ struct MData
   uint8_t  Comp:1;
   uint8_t  Recording:1;
   uint8_t  Unk2:2;   // byte 1
-
-  uint8_t  Unk3:4; // byte 2
+  uint8_t  Beeper:2; // 1=high, 2=low
+  uint8_t  Unk3:2;   // byte 2
   uint8_t  Mode:4;
   uint8_t  Select:4; // byte 3
   uint8_t  Switch:4; // byte 3
   uint8_t  Range:4;  // byte 4
-  uint8_t  nUnk4:4;   // byte 4
+  uint8_t  nUnk4:4;  // byte 4
   MValue   Value;    // 5 bytes
-  UData    u;        // union based on dataType
+  UData    u;        // union based on modes
 };
 
 struct recReq
@@ -215,15 +246,6 @@ struct recCmd
 };
 
 #pragma pack(pop)
-
-enum RXID{
-  RX_ACK = 1,
-  RX_MDATA,
-  RX_SAVE_ENT,
-  RX_REC_ENT,
-  RX_REC_DATA,
-  RX_REC_CNT = 0x72
-};
 
 class UT181Interface
 {
