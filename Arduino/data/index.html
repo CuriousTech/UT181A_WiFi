@@ -91,13 +91,14 @@ ws.onmessage=function(evt){
 	a.time.innerHTML=dt.toLocaleTimeString()+'.'+d.tk
 	a.value.innerHTML=d.v
 	a.unit.innerHTML=fixLabel(d.u)
+	if(typeof(d.vlt)!='undefined') a.batt.innerHTML=d.vlt+'V'
 	a.v1.innerHTML=(typeof(d.v1)!='undefined')?d.v1:''
 	if(d.st&(1<<6))
 		a.v1.setAttribute('style',d.v1=='FAIL'?'color:red':'color:green')
 	a.v2.innerHTML=(typeof(d.v2)!='undefined')?d.v2:''
 	a.v3.innerHTML=(typeof(d.v3)!='undefined')?d.v3:''
 	if(+d.a){
-	 aa=[dt,d.v,+d.v1,+d.v2,+d.v3]
+	 aa=[dt,+d.bv,+d.v1,+d.v2,+d.v3]
 	 va.push(aa)
 	}
 	min=+d.mn
@@ -142,7 +143,7 @@ ws.onmessage=function(evt){
  else if(event == 'range')
  {
   a.status.innerHTML=''
-  va=[]
+//  va=[]
   d=JSON.parse(data)
   for(i=0;i<3;i++){
    item=document.getElementById('s'+i)
@@ -162,6 +163,7 @@ ws.onmessage=function(evt){
 //   if(i==idx) item.setAttribute('style','background-color:red')
    item.innerHTML=d.o[i]
   }
+  a.v1.setAttribute('style','')
   a.mm.innerHTML=d.l0
   a.u1.innerHTML=fixLabel(d.u1)
   a.u2.innerHTML=fixLabel(d.u2)
@@ -381,34 +383,20 @@ function showRate(){
  rates=['100ms','200ms','500ms','1 sec','2 sec','5 sec','10sec','30sec',' 1 min']
  a.rate.value=rates[rate]
 }
-function trueValue(val,Unit)
-{
- switch(Unit.charAt(0))
- {
-	case 'k': scl=1000;break
-	case 'M': scl=1000000;break
-	case 'm': scl=0.001;break
-	case 'u': scl=0.000001;break
-	case 'n': scl=0.000000001;break
-	default: scl=1;break
- }
- return val*scl
-}
-
 </script>
 <body bgcolor="black" text="silver"  onload="{startWS()}">
 <div>
 <table align=center width=360>
-<tr align=center><td colspan=2><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td colspan=2><div style="font-size:large">WiFi UT181A</div></td></tr>
+<tr align=center><td><div id="batt" style="font-size:small"> 3.7V</div></td><td><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td colspan=2><div style="font-size:large">WiFi UT181A</div></td></tr>
 <tr align=center><td width=50><td><div id="mm" width=60></div></td><td width=50><div id="h"></div></td><td width=70><div id="am">AUTO</div></td></tr>
 </table>
 <table align=center width=360>
 <tr align=center><td width=150 align="right" colspan=2><div id="value" style="font-size:xx-large">0L</div></td><td><div id="unit">DCV</div></td>
 <td><div id="pm"></div><img id="imag" src='' style="width:38px"></td></tr>
 <tr><td colspan=4><canvas id="bar" width="360" height="40" style="float:center"></td></tr>
-<tr><td><div id="l1"></div></td><td><div id="v1"></div></td><td><div id="u1"></div></td><td align="right"><div id="t1"></div></td></tr>
-<tr><td><div id="l2"></div></td><td><div id="v2"></div></td><td><div id="u2"></div></td><td align="right"><div id="t2"></div></td></tr>
-<tr><td><div id="l3"></div></td><td><div id="v3"></div></td><td><div id="u3"></div></td><td align="right"><div id="t3"></div></td></tr>
+<tr><td><div id="l1"></div></td><td align="right"><div id="v1"></div></td><td><div id="u1" align="center"></div></td><td align="right"><div id="t1" align="center"></div></td></tr>
+<tr><td><div id="l2"></div></td><td align="right"><div id="v2"></div></td><td><div id="u2" align="center"></div></td><td align="right"><div id="t2" align="center"></div></td></tr>
+<tr><td><div id="l3"></div></td><td align="right"><div id="v3"></div></td><td><div id="u3" align="center"></div></td><td align="right"><div id="t3" align="center"></div></td></tr>
 <tr><td colspan=4><input type="button" value="Hold" id="hold" onClick="{setVar('hold', 0)}">
 <div class="dropdown">
   <button class="dropbtn">Select</button>
