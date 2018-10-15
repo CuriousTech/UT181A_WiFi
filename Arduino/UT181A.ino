@@ -58,6 +58,7 @@ int serverPort = 80;
 #define SCL        4
 #define SDA        5
 #define SER2_RX   13  //
+#define V_PULSE   14
 #define SER2_TX   15
 
 SSD1306 display(0x3c, 5, 4); // Initialize the oled display for address 0x3c, sda=5, sdc=4
@@ -77,6 +78,7 @@ UT181Interface ut;
 uint32_t oldOpt;
 uint16_t skipCnt;
 uint8_t tick;
+uint16_t volts;
 
 String timeFmt(uint32_t val) // convert seconds to hh:mm:ss
 {
@@ -103,11 +105,17 @@ String dataJson() // main meter data 10Hz
   s += "\"t\":";    s += now() - ( (ee.tz + utime.getDST() ) * 3600);
   s += ",\"tk\":";  s += tick;
   s += ",\"v\":\""; s += ut.ValueText(0); // primary value
+
   s += "\",\"bv\":\"";
-  if(ut.m_MData.Rel)
-    s += ut.m_MData.u.Ext.Value3.fValue;
+  if(ut.m_MData.ShowBar == 0 || ut.m_MData.MinMax) // invalid bar graph (use main value)
+  {
+    s += ut.ValueText(0);
+  }
   else
-    s += ut.m_MData.u.Std.fBarValue; // 10Hz bar value
+  {
+    s += (ut.m_MData.Rel) ? ut.m_MData.u.Ext.Value3.fValue : ut.m_MData.u.Std.fBarValue; // 10Hz bar value
+  }
+
   s += "\",\"u\":\""; s += ut.UnitText(); // unit of measurement
   if(ut.m_MData.Recording) // recording timer
   {
@@ -119,7 +127,11 @@ String dataJson() // main meter data 10Hz
   {
     if(ut.m_MData.Comp) // comp mode
     {
-      s += "\",\"v1\":\""; s += ut.m_MData.u.Comp.Fail ? "FAIL" : "PASS";
+      s += "\",\"v1\":\"";
+      if(ut.m_MData.Switch == 4 && ut.m_MData.Select >1) // temp
+        s += ut.m_MData.u.CompTemp.Fail ? "FAIL" : "PASS";
+      else
+        s += ut.m_MData.u.Std.Fail ? "FAIL" : "PASS";
     }
     else
       if(ut.DisplayCnt()>1){ s += "\",\"v1\":\""; s += ut.ValueText(1); }
@@ -153,6 +165,16 @@ String dataJson() // main meter data 10Hz
     s += ",\"t2\":"; s += ut.m_MData.u.RecTimer.dwRemain;
     s += ",\"t3\":"; s += ut.m_MData.u.RecTimer.dwSamples;
   }
+
+  static uint16_t vcnt = 10;
+  if(--vcnt == 0)
+  {
+    vcnt = 10*10; // send every 10 seconds
+    s += ",\"vlt\":\""; s += (float)volts / 1000; s += "\"";
+  }
+
+//  s += ",\"typ\":"; s += ut.m_MData.type;
+  
   s += "}\n";
   return s;
 }
@@ -274,7 +296,7 @@ String rangesJson() // get range and select options for dropdowns
       s += ut.m_MData.u.Std.szUnit;
     s += "\",\"u3\":\"\"";
   }
-  else if(ut.m_MData.Ext)
+  else if(ut.m_MData.type == 3 || ut.m_MData.type == 6)
   {
     fixDeg(ut.m_MData.u.Ext.szUnit1);
     fixDeg(ut.m_MData.u.Ext.szUnit2);
@@ -335,9 +357,30 @@ String rangesJson() // get range and select options for dropdowns
   {
       static char *compM[] = {"INNER", "OUTER", "< VALUE", "> VALUE"};
       s += ",\"l0\":\"\"";
-      s += ",\"l1\":\"MODE: "; s += compM[ut.m_MData.u.Comp.CompMode]; s+= "\"";
-      s += ",\"l2\":\"LOW:  "; s += ut.m_MData.u.Comp.fLow; s += "\"";
-      s += ",\"l3\":\"HIGH: "; s += ut.m_MData.u.Comp.fHigh; s += "\"";
+
+      if(ut.m_MData.Switch == 4 && ut.m_MData.Select >1) // temp
+      {
+        s += ",\"l1\":\"MODE: "; s += compM[ut.m_MData.u.CompTemp.CompMode]; s+= "\"";
+        s += ",\"l2\":\"LOW:  "; s += ut.m_MData.u.CompTemp.fLow; s += "\"";
+        s += ",\"l3\":\"HIGH: "; s += ut.m_MData.u.CompTemp.fHigh; s += "\"";
+      }
+      else
+      {
+        s += ",\"l1\":\"MODE: "; s += compM[ut.m_MData.u.Std.CompMode]; s+= "\"";
+        switch(ut.m_MData.u.Std.CompMode)
+        {
+          case 0:
+          case 1:
+            s += ",\"l2\":\"LOW:  "; s += ut.m_MData.u.Std.fLow; s += "\"";
+            s += ",\"l3\":\"HIGH: "; s += ut.m_MData.u.Std.fHigh; s += "\"";
+            break;
+          case 2:
+          case 3:
+            s += ",\"l2\":\"VALUE:  "; s += ut.m_MData.u.Std.fHigh; s += "\"";
+            s += ",\"l3\":\"\"";
+            break;
+        }
+      }
   }
   else // normal
   {
@@ -525,7 +568,7 @@ void sendSaveEntry(SaveRec *pRec)
   s += ut.ValueText(pRec->Value0);
   s += "\"],[\"";
 
-  if(pRec->MinMax2)
+  if(pRec->type == 3) // MaxMin
   {
       fixDeg(pRec->u.b.szLabel);
       s += pRec->u.b.szLabel;
@@ -534,13 +577,13 @@ void sendSaveEntry(SaveRec *pRec)
       s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value23);
       s += "\"]]";
   }
-  else if( !pRec->Ext) // normal
+  else if( pRec->type == 0) // normal
   {
       fixDeg(pRec->u.a.szLabel0);
       s += pRec->u.a.szLabel0;
       s += "\"]]";    
   }
-  else if(pRec->Triple) // 3 values
+  else if(pRec->type == 3) // 3 values
   {
       fixDeg(pRec->u.a.szLabel0);
       fixDeg(pRec->u.a.szLabel1);
@@ -667,6 +710,7 @@ void setup()
   const char hostName[] ="UT181A";
 
   pinMode(ESP_LED, OUTPUT);
+  pinMode(V_PULSE, OUTPUT);
   digitalWrite(ESP_LED, LOW);
 
   // initialize dispaly
@@ -770,6 +814,9 @@ void setup()
 
   attachInterrupt(BUTTON, btnISR, FALLING);
   digitalWrite(ESP_LED, HIGH); // blue LED off
+
+  display.clear();
+  display.display();
 }
 
 void sendBinData(uint8_t *p, int len)
@@ -830,6 +877,10 @@ void loop()
       if(ut.m_bConnected == false)
         ut.start(true);
     }
+    digitalWrite(V_PULSE, LOW);
+    uint16_t v = analogRead(0);
+    volts = (v * 5.25);
+    digitalWrite(V_PULSE, HIGH);
   }
 
   // draw the screen here
