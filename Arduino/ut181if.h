@@ -95,10 +95,8 @@ struct Record
 struct SaveRec
 {
   uniDate Date; // 4 bytes
-  uint8_t MinMax2:1; // 5 bytes...
-  uint8_t Ext:1;
-  uint8_t Triple:1;
-  uint8_t Norm:1;
+  uint8_t type:3;
+  uint8_t ShowBar:1;
   uint8_t Rel:1;
   uint8_t MinMax:1;
   uint8_t Peak:1;
@@ -147,14 +145,7 @@ struct SaveRec
 
 union UData
 {
-  struct
-  {
-    char    szUnit[8];
-    float   fBarValue;
-    char    szUnit2[8];
-    char    pad1[26];
-  } Std; // 20
-  struct // Comp mode
+  struct // normal and Comp mode
   {
     char    szUnit[8];
     float   fBarValue;
@@ -169,7 +160,21 @@ union UData
     float   fHigh;
     float   fLow;
     char pad2[15];
-  } Comp; // 31
+  } Std; // 31
+  struct // temp mode comp
+  {
+    char    szUnit[8];
+    uint8_t CompMode:2;
+    uint8_t Unk1:1;
+    uint8_t BeepMode:3;
+    uint8_t Unk2:2;
+    uint8_t Fail:1;
+    uint8_t Unk3:7;
+    uint8_t Precision;
+    float   fHigh;
+    float   fLow;
+    char    pad3[26];
+  } CompTemp; //20
   struct // peak mode, dbV, relative, temp rel
   {
     char   szUnit[8];
@@ -186,7 +191,7 @@ union UData
     uint32_t dwElapsed;
     uint32_t dwRemain;
     uint32_t dwSamples;
-    char pad3[26];
+    char     pad3[26];
   } RecTimer; // 20
   struct
   {
@@ -197,16 +202,17 @@ union UData
     MValue   Value3;
     uint32_t dwTime3;
     char     szUnit[8];
-    char pad4[11];
+    char     pad4[11];
   } MM; // 35
 };
 
 struct MData
 {
-  uint8_t  MinMax2:1;
-  uint8_t  Ext:1; // 4 value
-  uint8_t  Triple:1; // 3 value
-  uint8_t  Norm:1;
+  uint8_t type:3;
+//  uint8_t  MinMax2:1;
+//  uint8_t  Ext:1; // 4 value
+//  uint8_t  Triple:1; // 3 value
+  uint8_t  ShowBar:1;
   uint8_t  Rel:1;
   uint8_t  MinMax:1;
   uint8_t  Peak:1;
