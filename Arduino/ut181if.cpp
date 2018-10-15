@@ -518,14 +518,16 @@ int UT181Interface::DisplayCnt()
   if(m_MData.MinMax)  return 4;
   if(m_MData.Rel)     return 3;
   if(m_MData.Peak)    return 2;
-  if(m_MData.Comp)
+  if(m_MData.Comp)    return 1;
+
+  switch(m_MData.type)
   {
-    return (m_MData.u.Comp.CompMode > 1) ? 3:2;
+    case 1:
+    case 2: return 2;
+    case 3:
+    case 6:
+    case 7: return 3;
   }
-  if(m_MData.Norm && m_MData.Triple && m_MData.Ext) return 3;
-  if(m_MData.Norm && m_MData.Ext) return 2;
-  if(m_MData.Triple && m_MData.Ext) return 3;
-  if(m_MData.Ext) return 2;
   return 1;
 }
 
@@ -543,7 +545,7 @@ char *UT181Interface::ValueText(int which)
   if(DisplayCnt()-1 < which)
     return "";
 
-  if(m_MData.MinMax)
+ if(m_MData.MinMax)
     switch(which)
     {
       default:  Value = m_MData.Value; break;
@@ -645,15 +647,8 @@ void UT181Interface::RangeMod(int &nMin, int &nMax, int &nMod)
   if(nMax == 1000)
     nMod = 12;
 
-  if(m_MData.Peak) // no bar
+  if(m_MData.ShowBar == 0 || m_MData.MinMax) // no bar graph
     nMod = 0;
-
-  if(m_MData.Ext) // temp?
-    nMod = 0;
-
-  if(m_MData.Norm)
-      if(m_MData.Switch == eSwitch_mVDC)
-        nMod = 0;
 }
 
 void UT181Interface::getSign()
@@ -691,25 +686,10 @@ uint16_t UT181Interface::StatusBits()
   uint16_t bits = 0;
 
     // Switch modes
-  switch(m_MData.Switch)
-  {
-    case eSwitch_Ohms: // Ohms
-      switch(m_MData.Select)
-      {
-        case 2: // cont check
-          bits |= (1<<1);
-          break;
-      }
-      break;
-    case eSwitch_Diode:
-      switch(m_MData.Select)
-      {
-        case 1: // Diode
-          bits |= (1<<2);
-          break;
-      }
-      break;
-  }
+  if(m_MData.Switch == eSwitch_Ohms && m_MData.Select == 2) // Ohms
+    bits |= (1<<1);
+  if(m_MData.Switch == eSwitch_Diode && m_MData.Select == 1) // Diode
+    bits |= (1<<2);
 
   if(m_bSign)         bits |= 1;
   if(m_MData.Over)    bits |= (1<<3);
