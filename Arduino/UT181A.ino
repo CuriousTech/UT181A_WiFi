@@ -279,14 +279,6 @@ String rangesJson() // get range and select options for dropdowns
     s += "\",\"u2\":\"";
     s += "\",\"u3\":\"\"";
   }
-  else if(ut.m_MData.Rel)
-  {
-    fixDeg(ut.m_MData.u.Ext.szUnit1);
-    fixDeg(ut.m_MData.u.Ext.szUnit2);
-    s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
-    s += "\",\"u2\":\""; s += ut.m_MData.u.Ext.szUnit2;
-    s += "\",\"u3\":\"\"";
-  }
   else if(ut.m_MData.Switch==4 && ut.m_MData.Select > 1) // temp C or F
   {
     fixDeg(ut.m_MData.u.Std.szUnit);
@@ -297,6 +289,14 @@ String rangesJson() // get range and select options for dropdowns
     s += "\",\"u3\":\"\"";
   }
   else if(ut.m_MData.type == 3 || ut.m_MData.type == 6)
+  {
+    fixDeg(ut.m_MData.u.Ext.szUnit1);
+    fixDeg(ut.m_MData.u.Ext.szUnit2);
+    s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
+    s += "\",\"u2\":\""; s += ut.m_MData.u.Ext.szUnit2;
+    s += "\",\"u3\":\"\"";
+  }
+  else if(ut.m_MData.type == 7)
   {
     fixDeg(ut.m_MData.u.Ext.szUnit1);
     fixDeg(ut.m_MData.u.Ext.szUnit2);
