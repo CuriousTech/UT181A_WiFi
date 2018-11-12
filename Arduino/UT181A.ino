@@ -79,6 +79,7 @@ uint32_t oldOpt;
 uint16_t skipCnt;
 uint8_t tick;
 uint16_t volts;
+uint32_t voltTm;
 
 String timeFmt(uint32_t val) // convert seconds to hh:mm:ss
 {
@@ -100,10 +101,11 @@ String dataJson() // main meter data 10Hz
 {
   int nMin, nMax, nMod;
   ut.RangeMod(nMin, nMax, nMod);
+  uint32_t nw = now();
 
   String s = "state;{";
-  s += "\"t\":";    s += now() - ( (ee.tz + utime.getDST() ) * 3600);
-  s += ",\"tk\":";  s += tick;
+  s += "\"t\":";  s += nw - ( (ee.tz + utime.getDST() ) * 3600);
+  s += ".";  s += tick;
   s += ",\"v\":\""; s += ut.ValueText(0); // primary value
 
   s += "\",\"bv\":\"";
@@ -113,7 +115,7 @@ String dataJson() // main meter data 10Hz
   }
   else
   {
-    s += (ut.m_MData.Rel) ? ut.m_MData.u.Ext.Value3.fValue : ut.m_MData.u.Std.fBarValue; // 10Hz bar value
+    s += (ut.m_MData.type == 6) ? ut.m_MData.u.Ext.Value3.fValue : ut.m_MData.u.Std.fBarValue; // 10Hz bar value
   }
 
   s += "\",\"u\":\""; s += ut.UnitText(); // unit of measurement
@@ -141,9 +143,10 @@ String dataJson() // main meter data 10Hz
   s += "\",\"mn\":"; s += nMin; // min/max for bar display
   s += ",\"mx\":"; s += nMax;
   s += ",\"md\":"; s += nMod;
-  s += ",\"st\":"; s += ut.StatusBits(); // all the single bit flags
+  s += ",\"st\":"; s += String(ut.StatusBits(), HEX); // bit flags in HEX
 
   bool bAdd = (ut.m_MData.Value.L || ut.m_MData.Value.Blank || ut.m_MData.LeadErr || ut.m_MData.Hold) ? false:true; // skip blanks
+  if(ut.Connected() == false) bAdd = false;
   static uint16_t skipList[] = {0,1,4,9,19,49,99,299,599}; // chart logging frequency
   if(ee.rate)
   {
@@ -166,15 +169,12 @@ String dataJson() // main meter data 10Hz
     s += ",\"t3\":"; s += ut.m_MData.u.RecTimer.dwSamples;
   }
 
-  static uint16_t vcnt = 10;
-  if(--vcnt == 0)
+  if(nw - voltTm >= 10) // every 10 seconds
   {
-    vcnt = 10*10; // send every 10 seconds
+    voltTm = nw;
     s += ",\"vlt\":\""; s += (float)volts / 1000; s += "\"";
   }
 
-//  s += ",\"typ\":"; s += ut.m_MData.type;
-  
   s += "}\n";
   return s;
 }
@@ -583,7 +583,7 @@ void sendSaveEntry(SaveRec *pRec)
       s += pRec->u.a.szLabel0;
       s += "\"]]";    
   }
-  else if(pRec->type == 3) // 3 values
+  else if(pRec->type == 6) // 3 values
   {
       fixDeg(pRec->u.a.szLabel0);
       fixDeg(pRec->u.a.szLabel1);
@@ -593,6 +593,18 @@ void sendSaveEntry(SaveRec *pRec)
       s += "\"],[\""; s += pRec->u.a.szLabel1;
       s += "\"],[\""; s += ut.ValueText(pRec->u.a.Value12);
       s += "\"],[\""; s += pRec->u.a.szLabel2;
+      s += "\"]]";    
+  }
+  else if(pRec->type == 7) // 4 values
+  {
+      fixDeg(pRec->u.b.szLabel);
+      s += pRec->u.b.szLabel;
+      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value21);
+      s += "\"],[\""; s += pRec->u.b.szLabel;
+      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value22);
+      s += "\"],[\""; s += pRec->u.b.szLabel;
+      s += "\"],[\""; s += ut.ValueText(pRec->u.b.Value23);
+      s += "\"],[\""; s += pRec->u.b.szLabel;
       s += "\"]]";    
   }
   else // 2 values
@@ -605,7 +617,7 @@ void sendSaveEntry(SaveRec *pRec)
       s += "\"]]";
   }
 
-  s += "}";
+  s += ",\"b\":"; s+=pRec->type; s+="}";
   ws.textAll(s);
 }
 
@@ -845,7 +857,7 @@ void loop()
   }
   ut.service(nw); // read serial data
 
-  if(ut.Updated()) // new packet ready
+  if(ut.Updated() || (tick==0 && !ut.Connected()) ) // new packet ready, or not receiving
   {
     ws.textAll(dataJson());
     tick++;
