@@ -103,7 +103,7 @@ struct SaveRec
   uint8_t Hold:1;
   uint8_t Auto:1;
   uint8_t Over:1;
-  uint8_t Unk1:1;
+  uint8_t Discharge:1;
   uint8_t LeadError:1;
   uint8_t Comp:1;
   uint8_t Recording:1;
@@ -208,10 +208,7 @@ union UData
 
 struct MData
 {
-  uint8_t type:3;
-//  uint8_t  MinMax2:1;
-//  uint8_t  Ext:1; // 4 value
-//  uint8_t  Triple:1; // 3 value
+  uint8_t  type:3;
   uint8_t  ShowBar:1;
   uint8_t  Rel:1;
   uint8_t  MinMax:1;
@@ -220,18 +217,19 @@ struct MData
 
   uint8_t  Auto:1;   // byte 1
   uint8_t  Over:1;
-  uint8_t  Unk1:1;
+  uint8_t  Discharge:1;
   uint8_t  LeadErr:1;
   uint8_t  Comp:1;
   uint8_t  Recording:1;
-  uint8_t  Unk2:2;   // byte 1
+  uint8_t  Unk1:2;   // byte 1
   uint8_t  Beeper:2; // 1=high, 2=low
-  uint8_t  Unk3:2;   // byte 2
+
+  uint8_t  Unk2:2;   // byte 2
   uint8_t  Mode:4;
   uint8_t  Select:4; // byte 3
   uint8_t  Switch:4; // byte 3
   uint8_t  Range:4;  // byte 4
-  uint8_t  nUnk4:4;  // byte 4
+  uint8_t  nUnk3:4;  // byte 4
   MValue   Value;    // 5 bytes
   UData    u;        // union based on modes
 };
@@ -260,6 +258,7 @@ public:
   void service(time_t nw);
   void start(bool bCont);
   bool Updated(void);
+  bool Connected(void);
   bool WriteData(uint8_t *pData, int len);
   String convertDate(uniDate &dt);
   char *ValueText(int which);
