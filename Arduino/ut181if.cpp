@@ -40,15 +40,7 @@ void UT181Interface::service(time_t nw)
             process_sentence(m_len-2);
           else
           {
-            String s;
-
-            s += "print;chk error ";
-            s += String(sum(m_buffer, m_len-2), HEX);
-            s += " ";
-            s += String(m_buffer[m_len-2], HEX);
-            s += String(m_buffer[m_len-1], HEX);
-
-            WsSend(s);
+            WsSend("print;chk error");
             digitalWrite(2, LOW); // strobe LED
             delay(5);
             digitalWrite(2, HIGH);
@@ -64,11 +56,7 @@ void UT181Interface::service(time_t nw)
   {
     m_keepAlive = nw;
     m_bConnected = false;
-    String s = "print; timeout ";
-    s += m_idx;
-    s += " ";
-    s += m_len;
-    WsSend(s);
+    WsSend("print; timeout");
     m_state = 0;
     m_idx = 0;
     m_len = 0;
@@ -85,6 +73,11 @@ bool UT181Interface::Updated() // check for new primary data packet update
   if(n != m_Updated) u = true;
   n = m_Updated;
   return u;
+}
+
+bool UT181Interface::Connected()
+{
+  return m_bConnected;
 }
 
 void UT181Interface::process_sentence(uint16_t len)
@@ -691,7 +684,7 @@ uint16_t UT181Interface::StatusBits()
   if(m_MData.Switch == eSwitch_Diode && m_MData.Select == 1) // Diode
     bits |= (1<<2);
 
-  if(m_bSign)         bits |= 1;
+  if(m_bConnected)    bits |= 1;
   if(m_MData.Over)    bits |= (1<<3);
   if(m_MData.Auto)    bits |= (1<<4);
   if(m_MData.Hold)    bits |= (1<<5);
@@ -701,6 +694,7 @@ uint16_t UT181Interface::StatusBits()
   if(m_MData.LeadErr) bits |= (1<<9);
   if(m_MData.Rel)     bits |= (1<<10);
   if(m_MData.MinMax)  bits |= (1<<11);
+  if(m_MData.Discharge) bits |= (1<<12);
 
   return bits;
 }
