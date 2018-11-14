@@ -680,12 +680,11 @@ uint16_t UT181Interface::StatusBits()
 
     // Switch modes
   if(m_MData.Switch == eSwitch_Ohms && m_MData.Select == 2) // Ohms
-    bits |= (1<<1);
-  if(m_MData.Switch == eSwitch_Diode && m_MData.Select == 1) // Diode
     bits |= (1<<2);
+  if(m_MData.Switch == eSwitch_Diode && m_MData.Select == 1) // Diode
+    bits |= (1<<3);
 
-  if(m_bConnected)    bits |= 1;
-  if(m_MData.Over)    bits |= (1<<3);
+  if(m_bConnected)    bits |= (1<<1);
   if(m_MData.Auto)    bits |= (1<<4);
   if(m_MData.Hold)    bits |= (1<<5);
   if(m_MData.Comp)    bits |= (1<<6);
@@ -694,7 +693,8 @@ uint16_t UT181Interface::StatusBits()
   if(m_MData.LeadErr) bits |= (1<<9);
   if(m_MData.Rel)     bits |= (1<<10);
   if(m_MData.MinMax)  bits |= (1<<11);
-  if(m_MData.Discharge) bits |= (1<<12);
+  if(m_MData.Over)    bits |= (1<<12);
+  if(m_MData.Discharge) bits |= (1<<13);
 
   return bits;
 }
