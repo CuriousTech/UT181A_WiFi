@@ -99,8 +99,6 @@ String timeFmt(uint32_t val) // convert seconds to hh:mm:ss
 
 String dataJson() // main meter data 10Hz
 {
-  int nMin, nMax, nMod;
-  ut.RangeMod(nMin, nMax, nMod);
   uint32_t nw = now();
 
   String s = "state;{";
@@ -140,10 +138,14 @@ String dataJson() // main meter data 10Hz
     if(ut.DisplayCnt() > 2){ s += "\",\"v2\":\""; s += ut.ValueText(2); }
     if(ut.DisplayCnt() > 3){ s += "\",\"v3\":\""; s += ut.ValueText(3); }
   }
-  s += "\",\"mn\":"; s += nMin; // min/max for bar display
-  s += ",\"mx\":"; s += nMax;
-  s += ",\"md\":"; s += nMod;
-  s += ",\"st\":"; s += String(ut.StatusBits(), HEX); // bit flags in HEX
+
+  int nMin, nMax, nMod;
+  ut.RangeMod(nMin, nMax, nMod);  // min/max/modulo for bar display
+  s += "\",\"mm\":\""; s += nMin; s += ","; s += nMax; s += ","; s += nMod; s += "\""; 
+  
+//  s += "\",\"mn\":"; s += nMin;
+//  s += ",\"mx\":"; s += nMax;
+//  s += ",\"md\":"; s += nMod;
 
   bool bAdd = (ut.m_MData.Value.L || ut.m_MData.Value.Blank || ut.m_MData.LeadErr || ut.m_MData.Hold) ? false:true; // skip blanks
   if(ut.Connected() == false) bAdd = false;
@@ -154,7 +156,9 @@ String dataJson() // main meter data 10Hz
       skipCnt = 0;
     else bAdd = false;
   }
-  s += ",\"a\":"; s += bAdd; // add to chart
+  uint16_t st = ut.StatusBits();
+  if(bAdd) st |= 1; // add to chart
+  s += ",\"st\":"; s += String(st, HEX); // bit flags in HEX
 
   if(ut.m_MData.MinMax) // min max trigger times
   {
@@ -195,7 +199,7 @@ String rangesJson() // get range and select options for dropdowns
     {{"Auto", "600", "6k", "60k", "600k", "6M", "60M", NULL}, {"Auto",NULL}, {"Auto",NULL} },
     {{"Auto",NULL}, {"Auto", "6n", "60n", "600n", "6µ", "60µ", "600µ", "6m", "60m", NULL},{"Auto",NULL}},
     {{"Auto", "60", "600", "6k", "60k", "600k", "6M", "60M", NULL},
-      {"Auto", "60", "600", "6k", "60k", NULL}, {"Auto",NULL} },
+     {"Auto", "60", "600", "6k", "60k", NULL}, {"Auto",NULL} },
     {{"Auto", "600", "6000", NULL}, {"Auto", "600", "6000", NULL}, {"Auto",NULL} },
     {{"Auto", "60", "600", NULL}, {"Auto", "60", "600", NULL}, {"Auto",NULL} },
     {{"Auto",NULL}, {"Auto",NULL}, {"Auto",NULL} },
@@ -219,7 +223,7 @@ String rangesJson() // get range and select options for dropdowns
     {"mVAC", NULL},
     {"VDC", NULL },
     {"mVDC", "C", "F",NULL},
-    {"Ohms", "Beep", "nS", NULL},
+    {"Ohms", "Cont", "nS", NULL},
     {"Diode", "Cap", NULL},
     {"Hz", "%", "Pulse",NULL},
     {"µADC", "µAAC", NULL},
@@ -263,132 +267,134 @@ String rangesJson() // get range and select options for dropdowns
     s += optList[sw][sel][i];
     s += "\"]";
   }
-  s += ']';
+  s += "],\"u\":["; // units
 
+  char *szUnits[4];
+  szUnits[0] = NULL;
+  szUnits[1] = NULL;
+  szUnits[2] = NULL;
+  szUnits[3] = NULL;
   if(ut.m_MData.MinMax) // extended units of measurement
   {
-    fixDeg(ut.m_MData.u.MM.szUnit);    
-    s += ",\"u1\":\""; s += ut.m_MData.u.MM.szUnit;
-    s += "\",\"u2\":\""; s += ut.m_MData.u.MM.szUnit;
-    s += "\",\"u3\":\""; s += ut.m_MData.u.MM.szUnit; s += "\"";
+    fixDeg(ut.m_MData.u.MM.szUnit);
+    szUnits[0] = ut.m_MData.u.MM.szUnit;
+    szUnits[1] = ut.m_MData.u.MM.szUnit;
+    szUnits[2] = ut.m_MData.u.MM.szUnit;
   }
   else if(ut.m_MData.Peak)
   {
     fixDeg(ut.m_MData.u.Ext.szUnit1);
-    s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
-    s += "\",\"u2\":\"";
-    s += "\",\"u3\":\"\"";
+    szUnits[0] = ut.m_MData.u.Ext.szUnit1;
   }
   else if(ut.m_MData.Switch==4 && ut.m_MData.Select > 1) // temp C or F
   {
     fixDeg(ut.m_MData.u.Std.szUnit);
-    s += ",\"u1\":\""; s += ut.m_MData.u.Std.szUnit;
-    s += "\",\"u2\":\"";
-    if(ut.m_MData.Mode >= 3) // subtractive shows both
-      s += ut.m_MData.u.Std.szUnit;
-    s += "\",\"u3\":\"\"";
+    szUnits[0] = ut.m_MData.u.Std.szUnit;
+    if(ut.m_MData.Mode >= 3)
+     szUnits[1] = ut.m_MData.u.Std.szUnit;
   }
   else if(ut.m_MData.type == 3 || ut.m_MData.type == 6)
   {
     fixDeg(ut.m_MData.u.Ext.szUnit1);
     fixDeg(ut.m_MData.u.Ext.szUnit2);
-    s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
-    s += "\",\"u2\":\""; s += ut.m_MData.u.Ext.szUnit2;
-    s += "\",\"u3\":\"\"";
+    szUnits[0] = ut.m_MData.u.Ext.szUnit1;
+    szUnits[1] = ut.m_MData.u.Ext.szUnit2;
   }
   else if(ut.m_MData.type == 7)
   {
     fixDeg(ut.m_MData.u.Ext.szUnit1);
     fixDeg(ut.m_MData.u.Ext.szUnit2);
     fixDeg(ut.m_MData.u.Ext.szUnit3);
-    s += ",\"u1\":\""; s += ut.m_MData.u.Ext.szUnit1;
-    s += "\",\"u2\":\""; s += ut.m_MData.u.Ext.szUnit2;
-    s += "\",\"u3\":\""; s += ut.m_MData.u.Ext.szUnit3; s += "\"";
+    szUnits[0] = ut.m_MData.u.Ext.szUnit1;
+    szUnits[1] = ut.m_MData.u.Ext.szUnit2;
+    szUnits[2] = ut.m_MData.u.Ext.szUnit3;
   }
-  else
+
+  for(i = 0; szUnits[i] && i<4; i++)
   {
-    s += ",\"u1\":\"\""; 
-    s += ",\"u2\":\"\"";
-    s += ",\"u3\":\"\"";
+    if(i) s += ",";
+    s += "[\"";
+    s += szUnits[i];
+    s += "\"]";
   }
+  s += "],\"l\":[";
+
+  String sLabels[5];
 
   if(ut.m_MData.MinMax) // labels
   {
-      s += ",\"l0\":\"MAX MIN\"";
-      s += ",\"l1\":\"Maximum\"";
-      s += ",\"l2\":\"Average\"";
-      s += ",\"l3\":\"Minimum\"";
+      sLabels[0] = "MAX MIN";
+      sLabels[1] = "Maximum";
+      sLabels[2] = "Average";
+      sLabels[3] = "Minimum";
   }
   else if(ut.m_MData.Recording)
   {
-      s += ",\"l0\":\"REC\""; 
-      s += ",\"l1\":\"Elapsed Time:\"";
-      s += ",\"l2\":\"Remain Time:\"";
-      s += ",\"l3\":\"Samples:\"";
+      sLabels[0] = "REC";
+      sLabels[1] = "Elapsed Time:";
+      sLabels[2] = "Remain Time:";
+      sLabels[3] = "Samples:";
   }
   else if(ut.m_MData.Rel)
   {
-      s += ",\"l0\":\"REL\""; 
-      s += ",\"l1\":\"Reference:\"";
-      s += ",\"l2\":\"Measurement:\"";
-      s += ",\"l3\":\"\"";
+      sLabels[0] = "REL"; 
+      sLabels[1] = "Reference:";
+      sLabels[2] = "Measurement:";
   }
   else if(ut.m_MData.Switch==4 && ut.m_MData.Select > 1) // Temp C or F
   {
-      s += ",\"l0\":\"\"";
+      sLabels[0] = "";
       if(ut.m_MData.Mode >= 3) // subtractive
       {
-        s += ",\"l1\":\"T1\"";
-        s += ",\"l2\":\"T2\"";
+        sLabels[1] = "T1";
+        sLabels[2] = "T2";
       }
       else if(ut.m_MData.Mode == 2) // reverse
       {
-        s += ",\"l1\":\"T1\"";
-        s += ",\"l2\":\"\"";
+        sLabels[1] = "T1";
       }
       else // normal
       {
-        s += ",\"l1\":\"T2\"";
-        s += ",\"l2\":\"\"";
+        sLabels[1] = "T2";
       }
-      s += ",\"l3\":\"\"";
   }
   else if(ut.m_MData.Comp)
   {
       static char *compM[] = {"INNER", "OUTER", "< VALUE", "> VALUE"};
-      s += ",\"l0\":\"\"";
+      sLabels[0] = "";
 
       if(ut.m_MData.Switch == 4 && ut.m_MData.Select >1) // temp
       {
-        s += ",\"l1\":\"MODE: "; s += compM[ut.m_MData.u.CompTemp.CompMode]; s+= "\"";
-        s += ",\"l2\":\"LOW:  "; s += ut.m_MData.u.CompTemp.fLow; s += "\"";
-        s += ",\"l3\":\"HIGH: "; s += ut.m_MData.u.CompTemp.fHigh; s += "\"";
+        sLabels[1] = "MODE: "; sLabels[1] += compM[ut.m_MData.u.CompTemp.CompMode];
+        sLabels[2] = "LOW:  "; sLabels[2] += ut.m_MData.u.CompTemp.fLow;
+        sLabels[3] = "HIGH: "; sLabels[3] += ut.m_MData.u.CompTemp.fHigh;
       }
       else
       {
-        s += ",\"l1\":\"MODE: "; s += compM[ut.m_MData.u.Std.CompMode]; s+= "\"";
+        sLabels[1] = "MODE: "; sLabels[1 ]+= compM[ut.m_MData.u.Std.CompMode];
         switch(ut.m_MData.u.Std.CompMode)
         {
           case 0:
           case 1:
-            s += ",\"l2\":\"LOW:  "; s += ut.m_MData.u.Std.fLow; s += "\"";
-            s += ",\"l3\":\"HIGH: "; s += ut.m_MData.u.Std.fHigh; s += "\"";
+            sLabels[2] = "LOW:  "; sLabels[2] += ut.m_MData.u.Std.fLow;
+            sLabels[3] = "HIGH: "; sLabels[3] += ut.m_MData.u.Std.fHigh;
             break;
           case 2:
           case 3:
-            s += ",\"l2\":\"VALUE:  "; s += ut.m_MData.u.Std.fHigh; s += "\"";
-            s += ",\"l3\":\"\"";
+            sLabels[2] = "VALUE:  "; sLabels[2] += ut.m_MData.u.Std.fHigh;
             break;
         }
       }
   }
-  else // normal
+
+  for(i = 0; sLabels[i].length() && i<5; i++)
   {
-      s += ",\"l0\":\"\"";
-      s += ",\"l1\":\"\"";
-      s += ",\"l2\":\"\"";
-      s += ",\"l3\":\"\"";
+    if(i) s += ",";
+    s += "[\"";
+    s += sLabels[i];
+    s += "\"]";
   }
+  s += "]";
   s += "}";
   return s;
 }
@@ -447,16 +453,17 @@ const char *jsonList1[] = { "cmd", // WebSocket commands
   "rel",
   "rec",
   "svs",
-  "name", // 9
+  "name", // 10
   "int",
   "sav",
   "stop",
   "file",
-  "snap", //14
+  "snap", //15
   "fmt",
   "delf",
   "dels",
   "rate",
+  "rclk", // 20
   NULL
 };
 
@@ -553,6 +560,9 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue) // 
         case 19: // rate
           ee.rate = iValue;
           skipCnt = 0;
+          break;
+        case 20: // sclk
+          ut.setClock();
           break;
       }
       break;
