@@ -88,12 +88,12 @@ ws.onmessage=function(evt){
  {
 	d=JSON.parse(data)
 	dt=new Date(d.t*1000)
-	a.time.innerHTML=dt.toLocaleString()+'.'+((d.t%1)*10).toFixed()
+	a.time.innerHTML=dt.toLocaleString()+'.'+d.tk
 	a.value.innerHTML=d.v
 	a.unit.innerHTML=fixLabel(d.u)
 	if(typeof(d.vlt)!='undefined')
 	{
-	 a.batt.innerHTML=d.vlt+'V'
+	 a.batt.innerHTML=d.vlt.toFixed(2)+'V'
 	 a.batt.setAttribute('style',d.vlt<3.6?'color:red':'')
 	}
 	a.v1.innerHTML=(typeof(d.v1)!='undefined')?d.v1:''
