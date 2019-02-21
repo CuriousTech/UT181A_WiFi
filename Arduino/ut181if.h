@@ -5,7 +5,8 @@
 #include <Arduino.h>
 
 enum UT_CMD{
-  CMD_SET_OPTION = 1,
+  CMD_NONE,
+  CMD_SET_OPTION,
   CMD_SET_RANGE,
   CMD_SET_REL,
   CMD_SET_MINMAX,
@@ -222,8 +223,8 @@ struct MData
   uint8_t  Comp:1;
   uint8_t  Recording:1;
   uint8_t  Unk1:2;   // byte 1
-  uint8_t  Beeper:2; // 1=high, 2=low
 
+  uint8_t  Beeper:2; // 1=high, 2=low
   uint8_t  Unk2:2;   // byte 2
   uint8_t  Mode:4;
   uint8_t  Select:4; // byte 3
@@ -236,15 +237,15 @@ struct MData
 
 struct recReq
 {
-  uint8_t Cmd;
+  uint8_t  Cmd;
   uint16_t wItem;
   uint32_t dwOffset;
 };
 
 struct recCmd
 {
-  uint8_t Cmd;
-  char szName[11];
+  uint8_t  Cmd;
+  char     szName[11];
   uint16_t wInterval;
   uint32_t dwDuration;
 };
