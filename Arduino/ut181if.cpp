@@ -600,7 +600,7 @@ void UT181Interface::RangeMod(int &nMin, int &nMax, int &nMod)
     {{6,60,600,1000,60},{60},{60}},               // VAC
     {{60,600,60,60,60},{60},{60}},                // mVAC
     {{6,60,600,1000,60},{60},{60}},               // VDC
-    {{60,600,60,60,60},{60,600,60,60,60},{60,600,60,60,60}},  // mVDC, C, F
+    {{60,600,60,60,60},{60,600,600,600,600},{60,600,600,600,600}},  // mVDC, C, F
     {{600,6,60,600,6,60},{600,600,600,600,600},{60,60,60,60,60}}, // Ohms,cont,nS
     {{30,30,30,30,30},{6,60,600,6,60,600,6,60},{60}}, // Diode, cap
     {{60,600,6,60,600,6,60},{60,600,6,60,600,6,60},{60,600,6,60,600,6,60}}, //Hz, %, pulse
@@ -632,6 +632,13 @@ void UT181Interface::RangeMod(int &nMin, int &nMax, int &nMod)
   if(r >= 8) r = 0;
 
   nMax = rangeListMax[sw][sel][r];
+  if(sw == 3 && sel) // temp
+  {
+    if(m_MData.Value.fValue > 60 || m_MData.u.Ext.Value1.fValue > 60)
+      nMax = 120;
+    if(m_MData.Value.fValue > 120 || m_MData.u.Ext.Value1.fValue > 120)
+      nMax = 600;
+  }
 
   if( m_bSign)
     nMin = -nMax;
