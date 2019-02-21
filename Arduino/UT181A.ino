@@ -35,14 +35,16 @@ SOFTWARE.
 #include <ESP8266NetBIOS.h>
 #include "WiFiManager.h"
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
+#include <DNSServer.h>
 #include <TimeLib.h> // http://www.pjrc.com/teensy/td_libs_Time.html
-#include <UdpTime.h>
+#include <UdpTime.h> // https://github.com/CuriousTech/
 #include "eeMem.h"
 #include <JsonParse.h> // https://github.com/CuriousTech/ESP8266-HVAC/tree/master/Libraries/JsonParse
+#include "ut181if.h"
+#include "jsonstring.h"
 #ifdef OTA_ENABLE
 #include <FS.h>
 #include <ArduinoOTA.h>
-#include "ut181if.h"
 #endif
 #ifdef USE_SPIFFS
 #include <FS.h>
@@ -64,6 +66,7 @@ int serverPort = 80;
 SSD1306 display(0x3c, 5, 4); // Initialize the oled display for address 0x3c, sda=5, sdc=4
 
 WiFiManager wifi;  // AP page:  192.168.4.1
+DNSServer dnsServer;
 AsyncWebServer server( serverPort );
 AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 AsyncWebSocket wsb("/bin"); // access at ws://[esp ip]/bin
@@ -100,52 +103,51 @@ String timeFmt(uint32_t val) // convert seconds to hh:mm:ss
 String dataJson() // main meter data 10Hz
 {
   uint32_t nw = now();
+  static uint16_t lastV;
 
-  String s = "state;{";
-  s += "\"t\":";  s += nw - ( (ee.tz + utime.getDST() ) * 3600);
-  s += ".";  s += tick;
-  s += ",\"v\":\""; s += ut.ValueText(0); // primary value
-
-  s += "\",\"bv\":\"";
+  jsonString js("state");
+  js.Var("t", nw - ( (ee.tz + utime.getDST() ) * 3600));
+  js.Var("tk", tick);
+  js.Var("v", ut.ValueText(0) ); // primary value
   if(ut.m_MData.ShowBar == 0 || ut.m_MData.MinMax) // invalid bar graph (use main value)
   {
-    s += ut.ValueText(0);
+    js.Var("bv", ut.ValueText(0));
   }
-  else
+  else  // 10Hz bar value
   {
-    s += (ut.m_MData.type == 6) ? ut.m_MData.u.Ext.Value3.fValue : ut.m_MData.u.Std.fBarValue; // 10Hz bar value
+    js.Var("bv", (ut.m_MData.type == 6) ? ut.m_MData.u.Ext.Value3.fValue : ut.m_MData.u.Std.fBarValue);
   }
 
-  s += "\",\"u\":\""; s += ut.UnitText(); // unit of measurement
+  js.Var("u", ut.UnitText() ); // unit of measurement
   if(ut.m_MData.Recording) // recording timer
   {
-    s += "\",\"v1\":\""; s += timeFmt(ut.m_MData.u.RecTimer.dwElapsed);
-    s += "\",\"v2\":\""; s += timeFmt(ut.m_MData.u.RecTimer.dwRemain);
-    s += "\",\"v3\":\""; s += ut.m_MData.u.RecTimer.dwSamples;
+    js.Var("v1", timeFmt(ut.m_MData.u.RecTimer.dwElapsed) );
+    js.Var("v2", timeFmt(ut.m_MData.u.RecTimer.dwRemain) );
+    js.Var("v3", ut.m_MData.u.RecTimer.dwSamples );
   }
   else // normal and others
   {
     if(ut.m_MData.Comp) // comp mode
     {
-      s += "\",\"v1\":\"";
+      char *p = "PASS";
       if(ut.m_MData.Switch == 4 && ut.m_MData.Select >1) // temp
-        s += ut.m_MData.u.CompTemp.Fail ? "FAIL" : "PASS";
-      else
-        s += ut.m_MData.u.Std.Fail ? "FAIL" : "PASS";
+      {
+        if(ut.m_MData.u.CompTemp.Fail) p = "FAIL";
+      }
+      else if (ut.m_MData.u.Std.Fail) p = "FAIL";
+      js.Var("v1", p);
     }
     else
-      if(ut.DisplayCnt()>1){ s += "\",\"v1\":\""; s += ut.ValueText(1); }
-    if(ut.DisplayCnt() > 2){ s += "\",\"v2\":\""; s += ut.ValueText(2); }
-    if(ut.DisplayCnt() > 3){ s += "\",\"v3\":\""; s += ut.ValueText(3); }
+      if(ut.DisplayCnt()>1) js.Var("v1", ut.ValueText(1) );
+    if(ut.DisplayCnt() > 2) js.Var("v2", ut.ValueText(2) );
+    if(ut.DisplayCnt() > 3) js.Var("v3", ut.ValueText(3) );
   }
 
   int nMin, nMax, nMod;
   ut.RangeMod(nMin, nMax, nMod);  // min/max/modulo for bar display
-  s += "\",\"mm\":\""; s += nMin; s += ","; s += nMax; s += ","; s += nMod; s += "\""; 
-  
-//  s += "\",\"mn\":"; s += nMin;
-//  s += ",\"mx\":"; s += nMax;
-//  s += ",\"md\":"; s += nMod;
+  String s = String(nMin) + ",";
+  s += nMax; s += ","; s += nMod; 
+  js.Var("mm", s);
 
   bool bAdd = (ut.m_MData.Value.L || ut.m_MData.Value.Blank || ut.m_MData.LeadErr || ut.m_MData.Hold) ? false:true; // skip blanks
   if(ut.Connected() == false) bAdd = false;
@@ -158,29 +160,29 @@ String dataJson() // main meter data 10Hz
   }
   uint16_t st = ut.StatusBits();
   if(bAdd) st |= 1; // add to chart
-  s += ",\"st\":"; s += String(st, HEX); // bit flags in HEX
+  js.Var("st", String(st, HEX) ); // bit flags in HEX
 
   if(ut.m_MData.MinMax) // min max trigger times
   {
-    s += ",\"t1\":"; s += ut.m_MData.u.MM.dwTime1;
-    s += ",\"t2\":"; s += ut.m_MData.u.MM.dwTime2;
-    s += ",\"t3\":"; s += ut.m_MData.u.MM.dwTime3;
+    js.Var("t1", ut.m_MData.u.MM.dwTime1);
+    js.Var("t2", ut.m_MData.u.MM.dwTime2);
+    js.Var("t3", ut.m_MData.u.MM.dwTime3);
   }
   else if(ut.m_MData.Recording)
   {
-    s += ",\"t1\":"; s += ut.m_MData.u.RecTimer.dwElapsed;
-    s += ",\"t2\":"; s += ut.m_MData.u.RecTimer.dwRemain;
-    s += ",\"t3\":"; s += ut.m_MData.u.RecTimer.dwSamples;
+    js.Var("t1", ut.m_MData.u.RecTimer.dwElapsed);
+    js.Var("t2", ut.m_MData.u.RecTimer.dwRemain);
+    js.Var("t3", ut.m_MData.u.RecTimer.dwSamples);
   }
 
-  if(nw - voltTm >= 10) // every 10 seconds
+  if(nw - voltTm >= 10 || volts != lastV) // every 10 seconds
   {
     voltTm = nw;
-    s += ",\"vlt\":\""; s += (float)volts / 1000; s += "\"";
+    lastV = volts;
+    js.Var("vlt", (float)volts / 1000);
   }
 
-  s += "}\n";
-  return s;
+  return js.Close();
 }
 
 void fixDeg(char *p) // deg kills websocket (try \xB0)
@@ -237,37 +239,14 @@ String rangesJson() // get range and select options for dropdowns
   if(sel >= 3) sel = 0;
 
   int i;
-  String s = "range;{\"rs\":";
-  s += ut.m_MData.Range;
-  s += ",\"os\":";
-  s += ut.m_MData.Select;
 
-  s += ",\"s\":[";
-  for(i = 0; selList[sw][i]; i++)
-  {
-    if(i) s += ",";
-    s += "[\"";
-    s += selList[sw][i];
-    s += "\"]";
-  }
+  jsonString js("range");
 
-  s += "],\"r\":[";
-  for(i = 0; rangeList[sw][sel][i]; i++)
-  {
-    if(i) s += ",";
-    s += "[\"";
-    s += rangeList[sw][sel][i];
-    s += "\"]";
-  }
-  s += "],\"o\":[";
-  for(i = 0; optList[sw][sel][i]; i++)
-  {
-    if(i) s += ",";
-    s += "[\"";
-    s += optList[sw][sel][i];
-    s += "\"]";
-  }
-  s += "],\"u\":["; // units
+  js.Var("rs", ut.m_MData.Range);
+  js.Var("os", ut.m_MData.Select);
+  js.Array("s", selList[sw] );
+  js.Array("r", rangeList[sw][sel] );
+  js.Array("o", optList[sw][sel] );
 
   char *szUnits[4];
   szUnits[0] = NULL;
@@ -310,14 +289,7 @@ String rangesJson() // get range and select options for dropdowns
     szUnits[2] = ut.m_MData.u.Ext.szUnit3;
   }
 
-  for(i = 0; szUnits[i] && i<4; i++)
-  {
-    if(i) s += ",";
-    s += "[\"";
-    s += szUnits[i];
-    s += "\"]";
-  }
-  s += "],\"l\":[";
+  js.Array("u", szUnits );
 
   String sLabels[5];
 
@@ -387,27 +359,19 @@ String rangesJson() // get range and select options for dropdowns
       }
   }
 
-  for(i = 0; sLabels[i].length() && i<5; i++)
-  {
-    if(i) s += ",";
-    s += "[\"";
-    s += sLabels[i];
-    s += "\"]";
-  }
-  s += "]";
-  s += "}";
-  return s;
+  js.Array("l", sLabels );
+
+  return js.Close();
 }
 
 String settingsJson() // EEPROM settings
 {
-  String s = "settings;{";
-  s += "\"tz\":"; s += ee.tz;
-  s += ",\"o\":"; s += ee.bEnableOLED;
-  s += ",\"f\":"; s += ee.exportFormat;
-  s += ",\"r\":"; s += ee.rate;
-  s += "}\n";
-  return s;
+  jsonString js("settings");
+  js.Var("tz", ee.tz);
+  js.Var("o", ee.bEnableOLED);
+  js.Var("f", ee.exportFormat);
+  js.Var("r", ee.rate);
+  return js.Close();
 }
 
 void parseParams(AsyncWebServerRequest *request) // parse URL params
@@ -528,8 +492,7 @@ void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue) // 
             if(strlen(szName) == 0) strcpy(szName, "Record_01");
             if(wInterval == 0) wInterval = 1;
             ut.StartRecord(szName, wInterval, iValue);
-            String s ="";
-            s += "print;Start record ";
+            String s = "print;Start record ";
             s += szName;
             s += " ";
             s += wInterval;
@@ -727,6 +690,8 @@ void btnISR() // Prog button on board
   bButtonPressed = true;
 }
 
+IPAddress apIP(192, 168, 4, 1);
+
 void setup()
 {
   const char hostName[] ="UT181A";
@@ -746,13 +711,14 @@ void setup()
   WiFi.hostname(hostName);
   wifi.autoConnect(hostName, "password");
 
-  MDNS.begin ( hostName, WiFi.localIP() );
-
 #ifdef USE_SPIFFS
   SPIFFS.begin();
   server.addHandler(new SPIFFSEditor("admin", "admin"));
 #endif
 
+  dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+  dnsServer.start(53, "*", apIP);
+  
   // attach AsyncWebSocket
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
@@ -823,8 +789,10 @@ void setup()
 
   server.begin();
 
-  MDNS.addService("http", "tcp", serverPort);
-  NBNS.begin(hostName);
+//  MDNS.addService("http", "tcp", serverPort);
+//  NBNS.begin(hostName);
+  MDNS.begin ( hostName );
+  MDNS.addService("http", "tcp", 80);
 
 #ifdef OTA_ENABLE
   ArduinoOTA.begin();
@@ -852,7 +820,8 @@ void loop()
   static uint8_t cnt;
   time_t nw;
 
-  MDNS.update();
+//  MDNS.update();
+  dnsServer.processNextRequest();
 #ifdef OTA_ENABLE
   ArduinoOTA.handle();
 #endif
