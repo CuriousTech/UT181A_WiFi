@@ -22,6 +22,8 @@ void UT181Interface::service(time_t nw)
       case 1:
         if(c == 0xCD)
           m_state = 2;
+        else
+          m_state = 0; // unexpected value
         break;
       case 2:
         m_len = (uint16_t)c;
@@ -526,9 +528,17 @@ int UT181Interface::DisplayCnt()
 
 char *UT181Interface::UnitText()
 {
-  char *p = (m_MData.MinMax) ? m_MData.u.MM.szUnit : m_MData.u.Std.szUnit;
-  if(*p == 0xB0) *p = '@'; // convert degree to ampersand
-  if(p[1] == 0xB0) p[1] = '@'; // convert degree to ampersand
+  if(m_MData.MinMax)
+  {
+    if(m_MData.u.MM.szUnit[0] == 0xB0) m_MData.u.MM.szUnit[0] = '@'; // convert degree to ampersand
+    if(m_MData.u.MM.szUnit[1] == 0xB0) m_MData.u.MM.szUnit[1] = '@';
+  }
+  else
+  {
+    if(m_MData.u.Std.szUnit[0] == 0xB0) m_MData.u.Std.szUnit[0] = '@'; // convert degree to ampersand
+    if(m_MData.u.Std.szUnit[1] == 0xB0) m_MData.u.Std.szUnit[1] = '@';
+  }
+  return (m_MData.MinMax) ? m_MData.u.MM.szUnit : m_MData.u.Std.szUnit;
 }
 
 char *UT181Interface::ValueText(int which)
