@@ -299,10 +299,10 @@ private:
   time_t uniDateToGTC(uniDate &dt);
 
   uint8_t  m_buffer[3200]; // 2254 required for records
+  int      m_Updated;
+  uint16_t m_len;
   uint16_t m_idx;
   uint8_t  m_state;
-  uint16_t m_len;
-  int      m_Updated;
 
   uint16_t m_nSaves;
   uint16_t m_nRecords;
