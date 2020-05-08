@@ -21,7 +21,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// Build with Arduino IDE 1.8.5, esp8266 SDK 2.4.2
+// Build with Arduino IDE 1.8.12, esp8266 SDK 2.7.1
 
 //uncomment to enable Arduino IDE Over The Air update code
 #define OTA_ENABLE
@@ -802,7 +802,7 @@ void setup()
 
   utime.start();
 
-  attachInterrupt(BUTTON, btnISR, FALLING);
+//  attachInterrupt(BUTTON, btnISR, FALLING);
   digitalWrite(ESP_LED, HIGH); // blue LED off
 
   display.clear();
@@ -811,7 +811,8 @@ void setup()
 
 void sendBinData(uint8_t *p, int len)
 {
-  wsb.binary(binClientID, p, len);
+  if(binClientID)
+    wsb.binary(binClientID, p, len);
 }
 
 void loop()
@@ -836,7 +837,7 @@ void loop()
   }
   ut.service(nw); // read serial data
 
-  if(ut.Updated() || (tick==0 && !ut.Connected()) ) // new packet ready, or not receiving
+  if(ut.Updated() || tick==0) // new packet ready, or not receiving
   {
     ws.textAll(dataJson());
     tick++;
