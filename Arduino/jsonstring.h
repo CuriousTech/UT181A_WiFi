@@ -6,6 +6,7 @@ public:
   jsonString(const char *pLabel = NULL)
   {
     m_cnt = 0;
+    s = String("");
     if(pLabel)
       s = pLabel, s += ";";
     s += "{";
