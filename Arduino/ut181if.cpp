@@ -9,6 +9,7 @@ extern void WsSend(String s);
 
 void UT181Interface::service(time_t nw)
 {
+  String s;
   while(Serial.available())
   {
     uint8_t c = Serial.read();
@@ -18,12 +19,25 @@ void UT181Interface::service(time_t nw)
       case 0:     // data packet: AB CD len len ............. chk chk
         if(c == 0xAB)
           m_state = 1;
+        else if(c == 0xCD)
+          m_state = 2;
+        else
+        {
+          s = "print;Expected AB got ";
+          s += String(c, HEX);
+          WsSend(s);
+        }
         break;
       case 1:
         if(c == 0xCD)
           m_state = 2;
         else
+        {
           m_state = 0; // unexpected value
+          s = "print;Expected CD got ";
+          s += String(c, HEX);
+          WsSend(s);
+        }
         break;
       case 2:
         m_len = (uint16_t)c;
@@ -31,6 +45,13 @@ void UT181Interface::service(time_t nw)
         break;
       case 3:
         m_len |= (uint16_t)(c << 8);
+        if(m_len > 3000)
+        {
+          s = "print;Unexpected length ";
+          s += m_len;
+          WsSend(s);
+          m_len = 1;
+        }
         m_state = 4;
         m_idx = 0;
         break;
@@ -42,7 +63,7 @@ void UT181Interface::service(time_t nw)
             process_sentence(m_len-2);
           else
           {
-            WsSend("print;chk error");
+            WsSend("print;Checksum error");
             digitalWrite(2, LOW); // strobe LED
             delay(5);
             digitalWrite(2, HIGH);
@@ -58,7 +79,7 @@ void UT181Interface::service(time_t nw)
   {
     m_keepAlive = nw;
     m_bConnected = false;
-    WsSend("print; timeout");
+    WsSend("print;Timeout");
     m_state = 0;
     m_idx = 0;
     m_len = 0;
