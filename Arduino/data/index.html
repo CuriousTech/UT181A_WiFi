@@ -63,17 +63,28 @@ z-index:1;
 <script type="text/javascript">
 a=document.all
 oledon=0;v=0;min=-60;max=60;mod=5;st=0;lastst=0;rate=0
-zoom=1
+zoom=1;btn=0;dispIdx=0
 va=new Array()
 function onWheel(we){
   if(we.deltaY>0) zoom++
   else if(zoom>1) zoom--
 }
+function setBtn(me){btn=1}
+function clrBtn(me){btn=0}
+function mMove(me){
+ if(btn){
+   dispIdx+=me.movementX*zoom
+   if(dispIdx<0) dispIdx=0
+ }
+}
+
 function startWS(){
 draw_bar(0,false)
 draw_chart()
-
 document.getElementById('chart').addEventListener("wheel", onWheel)
+document.getElementById('chart').addEventListener("mousedown", setBtn)
+document.getElementById('chart').addEventListener("mouseup", clrBtn)
+document.getElementById('chart').addEventListener("mousemove", mMove)
 
 ws=new WebSocket("ws://"+window.location.host+"/ws")
 //ws=new WebSocket("ws://192.168.0.111/ws")
@@ -296,8 +307,7 @@ function draw_chart(){
 try {
 	var c=document.getElementById('chart')
 	ctx=c.getContext("2d")
-	if(va.length>(c.width*zoom))
-	 for(i=0;i<zoom;i++) va.shift()
+	while(va.length>65500) va.shift()
 	ctx.fillStyle="#222"
 	ctx.fillRect(0,0,c.width,c.height)
 	ctx.fillStyle="#FFF"
@@ -331,7 +341,8 @@ try {
 	ctx.strokeStyle = "#555"
 	m=0
 	ctx.font="10px sans-serif"
-	for(i=va.length-1,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
+	ctx.fillText(zoom,c.width-1,10)
+	for(i=va.length-1-dispIdx,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
 	{
 		if(x%100==21)
 		{
@@ -353,7 +364,7 @@ try {
 	{
 		start=0
 		ctx.strokeStyle=colors[line]
-		for(i=va.length-1,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
+		for(i=va.length-1-dispIdx,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
 		{
 		  if(typeof(va[i][line])!='undefined'){
 			v0=va[i][line]
