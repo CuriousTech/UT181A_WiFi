@@ -1,7 +1,7 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>WiFi UT181A Web Page</title>
+<title>WiFi UT181A</title>
 <style type="text/css">
 input{
 border-radius: 5px;
@@ -63,10 +63,18 @@ z-index:1;
 <script type="text/javascript">
 a=document.all
 oledon=0;v=0;min=-60;max=60;mod=5;st=0;lastst=0;rate=0
+zoom=1
 va=new Array()
+function onWheel(we){
+  if(we.deltaY>0) zoom++
+  else if(zoom>1) zoom--
+}
 function startWS(){
 draw_bar(0,false)
 draw_chart()
+
+document.getElementById('chart').addEventListener("wheel", onWheel)
+
 ws=new WebSocket("ws://"+window.location.host+"/ws")
 //ws=new WebSocket("ws://192.168.0.111/ws")
 ws.onopen=function(evt){}
@@ -288,7 +296,8 @@ function draw_chart(){
 try {
 	var c=document.getElementById('chart')
 	ctx=c.getContext("2d")
-	if(va.length>c.width-19) va.shift()
+	if(va.length>(c.width*zoom))
+	 for(i=0;i<zoom;i++) va.shift()
 	ctx.fillStyle="#222"
 	ctx.fillRect(0,0,c.width,c.height)
 	ctx.fillStyle="#FFF"
@@ -322,7 +331,7 @@ try {
 	ctx.strokeStyle = "#555"
 	m=0
 	ctx.font="10px sans-serif"
-	for(i=1,x=21;i<va.length;i++,x++)
+	for(i=va.length-1,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
 	{
 		if(x%100==21)
 		{
@@ -344,15 +353,31 @@ try {
 	{
 		start=0
 		ctx.strokeStyle=colors[line]
-		for(i=0,x=21;i<va.length;i++,x++)
+		for(i=va.length-1,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
 		{
-			if(typeof(va[i][line])!='undefined'){
-				v0=va[i][line]
-				y=base-(v0/ciel*range)
-				if(!start){start=1;ctx.beginPath();ctx.moveTo(20,y)}
-				else if(start) ctx.lineTo(x,y)
+		  if(typeof(va[i][line])!='undefined'){
+			v0=va[i][line]
+			y=base-(v0/ciel*range)
+			if(!start){start=1;ctx.beginPath();ctx.moveTo(c.width-1,y)}
+			else if(start)
+			{
+				if(zoom>1)
+				{
+					min=max=y
+					for(j=i+1;j<i+zoom;j++)
+					{
+						v0=va[i][line]
+						y=base-(v0/ciel*range)
+						if(y<min) min=y
+						if(y>max) max=y
+					}
+					if(min<y) ctx.lineTo(x,min)
+					if(max>y) ctx.lineTo(x,max)
+				}
+				ctx.lineTo(x,y)
 			}
-			else if(start){ctx.stroke();start=0;}
+		  }
+		  else if(start){ctx.stroke();start=0;}
 		}
 		if(start)ctx.stroke()
 	}
