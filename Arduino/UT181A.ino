@@ -427,7 +427,7 @@ const char *jsonList1[] = { "cmd", // WebSocket commands
   "delf",
   "dels",
   "rate",
-  "rclk", // 20
+  "sclk", // 20
   NULL
 };
 
