@@ -26,7 +26,7 @@ body{width:340px;font-family: Arial, Helvetica, sans-serif; overflow:hidden;}
     background-color: #50a0ff;
     padding: 1px;
     font-size: 12px;
-	background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);
+	background-image: -webkit-linear-gradient(top, #efa0b0, #50a0ff);
 	border-radius: 5px;
 	margin-bottom: 5px;
 	box-shadow: 2px 2px 12px #000000;
@@ -42,13 +42,13 @@ body{width:340px;font-family: Arial, Helvetica, sans-serif; overflow:hidden;}
     display: none;
     position: absolute;
     background-color: #919191;
-    min-width: 60px;
-    min-height: 10px;
+    min-width: 40px;
+    min-height: 1px;
     z-index: 1;
 }
 .dropdown:hover .dropdown-content {display: block;}
 .dropdown:hover .dropbtn {background-color: #3e8e41;}
-.dropdown:hover .btn {	background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);}
+.dropdown:hover .btn {	background-image: -webkit-linear-gradient(top, #efffff, #a0a0ff);}
 #rec{
 opacity:.9;
 display:none;
@@ -107,13 +107,15 @@ ws.onmessage=function(evt){
  {
 	d=JSON.parse(data)
 	dt=new Date(d.t*1000)
-	a.time.innerHTML=dt.toLocaleString()+'.'+d.tk
+	tk=+d.tk
+	if(tk<10) tk=' '+tk+'&nbsp;'
+	a.time.innerHTML=dt.toLocaleString()+'.'+tk
 	a.value.innerHTML=d.v
 	a.unit.innerHTML=fixLabel(d.u)
 	if(typeof(d.vlt)!='undefined')
 	{
 	 a.batt.innerHTML=d.vlt.toFixed(2)+'V'
-	 a.batt.setAttribute('style',d.vlt<3.6?'color:red':'')
+	 a.batt.setAttribute('style',d.vlt<=3.6?'color:red':'')
 	}
 	a.v1.innerHTML=(typeof(d.v1)!='undefined')?d.v1:''
 	st=parseInt(d.st, 16)
@@ -377,8 +379,7 @@ try {
 					min=max=y
 					for(j=i+1;j<i+zoom;j++)
 					{
-						v0=va[i][line]
-						y=base-(v0/ciel*range)
+						y=base-(va[j][line]/ciel*range)
 						if(y<min) min=y
 						if(y>max) max=y
 					}
@@ -442,7 +443,7 @@ function beep() {
 <tr><td><div id="l1"></div></td><td align="right"><div id="v1"></div></td><td><div id="u1" align="center"></div></td><td align="right"><div id="t1" align="center"></div></td></tr>
 <tr><td><div id="l2"></div></td><td align="right"><div id="v2"></div></td><td><div id="u2" align="center"></div></td><td align="right"><div id="t2" align="center"></div></td></tr>
 <tr><td><div id="l3"></div></td><td align="right"><div id="v3"></div></td><td><div id="u3" align="center"></div></td><td align="right"><div id="t3" align="center"></div></td></tr>
-<tr><td colspan=4><input type="button" value="Hold" id="hold" onClick="{setVar('hold', 0)}">
+<tr><td colspan=4><input type="button" value="Hold " id="hold" onClick="{setVar('hold', 0)}">
 <div class="dropdown">
   <button class="dropbtn">Select</button>
   <div class="dropdown-content">
@@ -477,7 +478,7 @@ function beep() {
   </div>
 </div>
 <input type="button" value="REL" id="REL" onClick="{setVar('rel', 0)}">
-<input id='rval' type=text size=4 value='0'> &nbsp<input type="button" value="M/M" id="M/M" onClick="{setVar('mm', 0)}"></td></tr>
+<input id='rval' type=text size=5 value='0'> &nbsp<input type="button" value="M/M" id="M/M" onClick="{setVar('mm', 0)}"></td></tr>
 <tr><td colspan=4><canvas id="chart" width="360" height="360" style="float:center"></td></tr>
 <tr><td colspan=4><div id="rec"><div id="popupRec">
 <h2>Record</h2>
@@ -491,10 +492,10 @@ function beep() {
 </div>
 </td>
 </tr>
-<tr><td colspan=4> <div id="status"></div></td></tr>
 <tr><td colspan=4>OLED<input type="button" value="OFF" id="OLED" onClick="{oled()}"><input type="button" value="Save" onClick="{setVar('sav', 0)}">
 <input type="button" id="record" value="Record" onClick="{openRec()}"><input type="submit" value="Files" onClick="window.location='/files.html';">
 <input type="button" value="100ms" id="rate" onClick="{chgRate()}"> <input type="submit" value="Setup" onClick="window.location='/s';"></td></tr>
+<tr><td colspan=4> <div id="status"></div></td></tr>
 </table>
 </div>
 </body>
