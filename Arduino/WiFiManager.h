@@ -45,8 +45,6 @@ public:
     bool isCfg(void);
     int state(void);
 
-    //for convenience
-    String urldecode(const char*);
 private:
     int _state;
     int _timer;
