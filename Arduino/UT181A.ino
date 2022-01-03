@@ -31,10 +31,9 @@ SOFTWARE.
 #include <ssd1306_i2c.h> // https://github.com/CuriousTech/WiFi_Doorbell/tree/master/Libraries/ssd1306_i2c
 
 #include <EEPROM.h>
-#include <ESP8266mDNS.h>
-#include <ESP8266NetBIOS.h>
 #include "WiFiManager.h"
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
+#include <ESP8266mDNS.h>
 #include <DNSServer.h>
 #include <TimeLib.h> // http://www.pjrc.com/teensy/td_libs_Time.html
 #include <UdpTime.h> // https://github.com/CuriousTech/
@@ -66,7 +65,8 @@ int serverPort = 80;
 SSD1306 display(0x3c, 5, 4); // Initialize the oled display for address 0x3c, sda=5, sdc=4
 
 WiFiManager wifi;  // AP page:  192.168.4.1
-DNSServer dnsServer;
+//MDNSResponder mdns;
+//DNSServer dnsServer;
 AsyncWebServer server( serverPort );
 AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 AsyncWebSocket wsb("/bin"); // access at ws://[esp ip]/bin
@@ -376,7 +376,6 @@ String settingsJson() // EEPROM settings
 
 void parseParams(AsyncWebServerRequest *request) // parse URL params
 {
-  char sztemp[100];
   char password[64];
  
   if(request->params() == 0)
@@ -384,8 +383,7 @@ void parseParams(AsyncWebServerRequest *request) // parse URL params
 
   for ( uint8_t i = 0; i < request->params(); i++ ) {
     AsyncWebParameter* p = request->getParam(i);
-    p->value().toCharArray(sztemp, 100);
-    String s = wifi.urldecode(sztemp);
+    String s = request->urlDecode(p->value());
     bool which = (tolower(p->name().charAt(1) ) == 'd') ? 1:0;
     int val = s.toInt();
  
@@ -690,16 +688,21 @@ void btnISR() // Prog button on board
   bButtonPressed = true;
 }
 
-IPAddress apIP(192, 168, 4, 1);
+const char hostName[] ="UT181A";
+
+inline void ICACHE_RAM_ATTR buttonISR()
+{
+  
+}
 
 void setup()
 {
-  const char hostName[] ="UT181A";
-
   pinMode(ESP_LED, OUTPUT);
   pinMode(V_PULSE, OUTPUT);
   digitalWrite(ESP_LED, LOW);
 
+  attachInterrupt(BUTTON, buttonISR, FALLING);
+  
   // initialize dispaly
   display.init();
 //  display.flipScreenVertically();
@@ -716,9 +719,6 @@ void setup()
   server.addHandler(new SPIFFSEditor("admin", "admin"));
 #endif
 
-  dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-  dnsServer.start(53, "*", apIP);
-  
   // attach AsyncWebSocket
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);
@@ -789,11 +789,6 @@ void setup()
 
   server.begin();
 
-//  MDNS.addService("http", "tcp", serverPort);
-//  NBNS.begin(hostName);
-  MDNS.begin ( hostName );
-  MDNS.addService("http", "tcp", 80);
-
 #ifdef OTA_ENABLE
   ArduinoOTA.begin();
 #endif
@@ -821,13 +816,19 @@ void loop()
   static uint8_t cnt;
   time_t nw;
 
-//  MDNS.update();
-  dnsServer.processNextRequest();
+  MDNS.update();
 #ifdef OTA_ENABLE
   ArduinoOTA.handle();
 #endif
   utime.check(ee.tz);
 
+  wifi.service();
+  if(wifi.connectNew())
+  {
+    if(!MDNS.begin( hostName ) )
+      Serial.println("Error setting up mDNS");
+    MDNS.addService("iot", "tcp", 8080);
+  }
   nw = now();
   int s = second(nw);
   if(s !=lastS)
@@ -876,11 +877,11 @@ void loop()
   }
 
   // draw the screen here
-  if(ee.bEnableOLED && wifi.isCfg() == false)
+  if(ee.bEnableOLED)
   {
     display.clear();
     display.drawPropString( 2, 23, ut.ValueText(0) );
     display.drawPropString(80, 47, ut.UnitText() );
-    display.display();
+    display.updateChunk();
   }
 }
