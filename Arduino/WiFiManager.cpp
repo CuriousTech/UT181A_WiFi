@@ -10,19 +10,25 @@
  **************************************************************/
 
 #include "WiFiManager.h"
-#include "ssd1306_i2c.h"
-#include "icons.h"
 #include "eeMem.h"
 
+#define OLED_ENABLE
+
+#ifdef OLED_ENABLE
+#include "ssd1306_i2c.h"
+#include "icons.h"
 extern SSD1306 display;
+#endif
 
 WiFiManager::WiFiManager()
 {
 }
 
-void WiFiManager::autoConnect(char const *apName, const char *pPass) {
-    _apName = apName;
-    _pPass = pPass;
+// Start WiFi connection or AP if no SSID
+void WiFiManager::autoConnect(char const *apName, const char *pPass)
+{
+  _apName = apName;
+  _pPass = pPass;
 
 //  DEBUG_PRINT("");
 //    DEBUG_PRINT("AutoConnect");
@@ -32,70 +38,117 @@ void WiFiManager::autoConnect(char const *apName, const char *pPass) {
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(ee.szSSID, ee.szSSIDPassword);
-    WiFi.scanNetworks();
-    if ( hasConnected() )
-    {
-      _bCfg = false;
-      return;
-    }
+    WiFi.setHostname(apName);
+    _state = ws_connecting;
+    _timer = 50;
   }
+  else
+  {
+    startAP();
+  }
+}
+
+// Start AP mode
+void WiFiManager::startAP()
+{
   //setup AP
   WiFi.mode(WIFI_AP);
-  WiFi.softAP(apName);
+  WiFi.softAP(_apName);
   DEBUG_PRINT("Started Soft Access Point");
+#ifdef OLED_ENABLE
   display.print("AP started:");
   IPAddress apIp = WiFi.softAPIP();
   display.print(apIp.toString());
+#endif
 
   DEBUG_PRINT(WiFi.softAPIP());
-  DEBUG_PRINT("Don't forget the port #");
 
-  if (!MDNS.begin(apName))
+  if (!MDNS.begin(_apName))
     DEBUG_PRINT("Error setting up MDNS responder!");
   WiFi.scanNetworks();
 
-  _timeout = true;
-  _bCfg = true;
+  _state = ws_config;
 }
 
-boolean WiFiManager::hasConnected(void)
+// return current connection sate
+int WiFiManager::state()
 {
-  for(int c = 0; c < 50; c++)
-  {
-    if (WiFi.status() == WL_CONNECTED)
-      return true;
-    delay(200);
-    Serial.print(".");
-    display.clear();
-    display.drawXbm(34,10, 60, 36, WiFi_Logo_bits);
-    display.setColor(INVERSE);
-    display.fillRect(10, 10, 108, 44);
-    display.setColor(WHITE);
-    drawSpinner(4, c % 4);
-    display.display();
-  }
-  DEBUG_PRINT("");
-  DEBUG_PRINT("Could not connect to WiFi");
-  display.print("No connection");
-  return false;
+  return _state;
 }
 
+// returns true once after a connection is made (for time)
+bool WiFiManager::connectNew()
+{
+  if(_state == ws_connectSuccess)
+  {
+    _state = ws_connected;
+    return true;
+  }
+  return false; 
+}
+
+// returns true if in config/AP mode
 bool WiFiManager::isCfg(void)
 {
-  return _bCfg;
+  return (_state == ws_config);
 }
 
-void WiFiManager::setPass(const char *p){
+void WiFiManager::setPass(const char *p)
+{
   strncpy(ee.szSSIDPassword, p, sizeof(ee.szSSIDPassword) );
   eemem.update();
   DEBUG_PRINT("Updated EEPROM.  Restaring.");
   autoConnect(_apName, _pPass);
 }
 
-void WiFiManager::seconds(void) {
+// Called at any frequency
+void WiFiManager::service()
+{
   static int s = 1; // do first list soon
+  static uint32_t m;
+  static uint16_t ticks;
 
-  if(_timeout == false)
+  if((millis() - m) > 200)
+  {
+    m = millis();
+    ticks++;
+    if(_state == ws_connecting)
+    {
+#ifdef DEBUG
+      Serial.print(".");
+#endif
+#ifdef OLED_ENABLE
+      display.clear();
+      display.drawXbm(34,10, 60, 36, WiFi_Logo_bits);
+      display.setColor(INVERSE);
+      display.fillRect(10, 10, 108, 44);
+      display.setColor(WHITE);
+      drawSpinner(4, (_timer / 10) % 4);
+      display.display();
+#endif
+      if(_timer)
+      {
+        if (WiFi.status() == WL_CONNECTED)
+        {
+          DEBUG_PRINT("Connected");
+          _state = ws_connectSuccess;
+        }
+        else if(--_timer == 0)
+        {
+          DEBUG_PRINT("");
+          DEBUG_PRINT("Could not connect to WiFi");
+          startAP();
+        }
+      }
+      return;
+    }
+  }
+
+  if(ticks < 5)
+    return;
+  ticks = 0;
+
+  if(_state != ws_config)
     return;
   if(--s)
     return;
@@ -106,8 +159,9 @@ void WiFiManager::seconds(void) {
 
   for (int i = 0; i < n; i++)
   {
+#ifdef OLED_ENABLE
     display.print(WiFi.SSID(i));
-
+#endif
     if(WiFi.SSID(i) == ee.szSSID) // found cfg SSID
     {
       DEBUG_PRINT("SSID found.  Restarting.");
@@ -137,48 +191,11 @@ String WiFiManager::page()
   form.replace("$key", _pPass );
   s += form;
   s += HTTP_END;
-  
-  _timeout = false;
   return s;
 }
 
-String WiFiManager::urldecode(const char *src)
-{
-    String decoded = "";
-    char a, b;
-    while (*src) {
-        if ((*src == '%') &&
-            ((a = src[1]) && (b = src[2])) &&
-            (isxdigit(a) && isxdigit(b))) {
-            if (a >= 'a')
-                a -= 'a'-'A';
-            if (a >= 'A')
-                a -= ('A' - 10);
-            else
-                a -= '0';
-            if (b >= 'a')
-                b -= 'a'-'A';
-            if (b >= 'A')
-                b -= ('A' - 10);
-            else
-                b -= '0';
-            
-            decoded += char(16*a+b);
-            src+=3;
-        } else if (*src == '+') {
-            decoded += ' ';
-            *src++;
-        } else {
-            decoded += *src;
-            *src++;
-        }
-    }
-    decoded += '\0';
-    
-    return decoded;
-}
-
 void WiFiManager::drawSpinner(int count, int active) {
+#ifdef OLED_ENABLE
   for (int i = 0; i < count; i++) {
     const char *xbm;
     if (active == i) {
@@ -187,5 +204,6 @@ void WiFiManager::drawSpinner(int count, int active) {
        xbm = inactive_bits;  
     }
     display.drawXbm(64 - (12 * count / 2) + 12 * i,56, 8, 8, xbm);
-  }   
+  }
+#endif
 }
