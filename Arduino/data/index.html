@@ -87,7 +87,7 @@ document.getElementById('chart').addEventListener("mouseup", clrBtn)
 document.getElementById('chart').addEventListener("mousemove", mMove)
 
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.0.111/ws")
+//ws=new WebSocket("ws://192.168.0.117/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
@@ -113,10 +113,7 @@ ws.onmessage=function(evt){
 	a.value.innerHTML=d.v
 	a.unit.innerHTML=fixLabel(d.u)
 	if(typeof(d.vlt)!='undefined')
-	{
-	 a.batt.innerHTML=d.vlt.toFixed(2)+'V'
-	 a.batt.setAttribute('style',d.vlt<=3.6?'color:red':'')
-	}
+		draw_batt(d.vlt.toFixed(2))
 	a.v1.innerHTML=(typeof(d.v1)!='undefined')?d.v1:''
 	st=parseInt(d.st, 16)
 	if(st&(1<<6))
@@ -343,7 +340,7 @@ try {
 	ctx.strokeStyle = "#555"
 	m=0
 	ctx.font="10px sans-serif"
-	ctx.fillText(zoom,c.width-1,10)
+	ctx.fillText(zoom+':1',c.width-1,10)
 	for(i=va.length-1-dispIdx,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
 	{
 		if(x%100==21)
@@ -396,6 +393,23 @@ try {
 }catch(err){}
 }
 
+function draw_batt(v){
+try{
+	var c2 = document.getElementById('batt')
+	ctx=c2.getContext("2d")
+	ctx.fillStyle="#000";
+	ctx.fillRect(0,0,c2.width,c2.height)
+	w=c2.width/(4.2-3.6)*(v-3.6)
+	w=Math.max(0,w)
+	ctx.fillStyle="#990";
+	if(w <= 5) ctx.fillStyle="#F00";
+	if(w > c2.width-5) ctx.fillStyle="#0F0";
+	ctx.fillRect(0,0,w,c2.height)
+	ctx.fillStyle=(w==0)?"#F00":"#FFF";
+	ctx.font="bold 16px sans-serif";
+	ctx.fillText(v+'V', (c2.width/2)-(String(v).length/2)*8, 14)
+}catch(err){}
+}
 function openRec()
 {
  if(recording)
@@ -432,7 +446,7 @@ function beep() {
 <body bgcolor="black" text="silver"  onload="{startWS()}">
 <div>
 <table align=center width=370>
-<tr align=center><td><div id="batt" style="font-size:small"> 0.00V</div></td><td><button id="time" onclick="setVar('sclk',0)">0:00:00 AM.0</button>
+<tr align=center><td><canvas id="batt" width="50" height="16"></td><td><button id="time" onclick="setVar('sclk',0)">0:00:00 AM.0</button>
 </td><td colspan=2><div style="font-size:large">WiFi UT181A</div></td></tr>
 <tr align=center><td width=50><td><div id="mm" width=60></div></td><td width=50><div id="h"></div></td><td width=70><div id="am">AUTO</div></td></tr>
 </table>
