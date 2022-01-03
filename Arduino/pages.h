@@ -1,696 +1,731 @@
-const char page1[] PROGMEM =
-   "<!DOCTYPE html>\n"
-   "<html lang=\"en\">\n"
-   "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>\n"
-   "<title>WiFi UT181A</title>\n"
-   "<style type=\"text/css\">\n"
-   "input{\n"
-   "border-radius: 5px;\n"
-   "margin-bottom: 5px;\n"
-   "box-shadow: 2px 2px 12px #000000;\n"
-   "background-image: -moz-linear-gradient(top, #ffffff, #50a0ff);\n"
-   "background-image: -ms-linear-gradient(top, #ffffff, #50a0ff);\n"
-   "background-image: -o-linear-gradient(top, #ffffff, #50a0ff);\n"
-   "background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);\n"
-   "background-image: linear-gradient(top, #ffffff, #50a0ff);\n"
-   "background-clip: padding-box;\n"
-   "}\n"
-   "body{width:340px;font-family: Arial, Helvetica, sans-serif; overflow:hidden;}\n"
-   ".range{\n"
-   "  overflow: hidden;\n"
-   "}\n"
-   ".dropdown {\n"
-   "    position: relative;\n"
-   "    display: inline-block;\n"
-   "}\n"
-   ".dropbtn {\n"
-   "    background-color: #50a0ff;\n"
-   "    padding: 1px;\n"
-   "    font-size: 12px;\n"
-   "background-image: -webkit-linear-gradient(top, #efa0b0, #50a0ff);\n"
-   "border-radius: 5px;\n"
-   "margin-bottom: 5px;\n"
-   "box-shadow: 2px 2px 12px #000000;\n"
-   "}\n"
-   ".btn {\n"
-   "    background-color: #50a0ff;\n"
-   "    padding: 1px;\n"
-   "    font-size: 12px;\n"
-   "    min-width: 50px;\n"
-   "    border: none;\n"
-   "}\n"
-   ".dropdown-content {\n"
-   "    display: none;\n"
-   "    position: absolute;\n"
-   "    background-color: #919191;\n"
-   "    min-width: 40px;\n"
-   "    min-height: 1px;\n"
-   "    z-index: 1;\n"
-   "}\n"
-   ".dropdown:hover .dropdown-content {display: block;}\n"
-   ".dropdown:hover .dropbtn {background-color: #3e8e41;}\n"
-   ".dropdown:hover .btn {background-image: -webkit-linear-gradient(top, #efffff, #a0a0ff);}\n"
-   "#rec{\n"
-   "opacity:.9;\n"
-   "display:none;\n"
-   "top:300px;\n"
-   "left:150px;\n"
-   "position:absolute;\n"
-   "background-color:#A13131;\n"
-   "overflow:auto;\n"
-   "z-index:1;\n"
-   "}\n"
-   "</style>\n"
-   "<script type=\"text/javascript\">\n"
-   "a=document.all\n"
-   "oledon=0;v=0;min=-60;max=60;mod=5;st=0;lastst=0;rate=0\n"
-   "zoom=1;btn=0;dispIdx=0\n"
-   "va=new Array()\n"
-   "function onWheel(we){\n"
-   "  if(we.deltaY>0) zoom++\n"
-   "  else if(zoom>1) zoom--\n"
-   "}\n"
-   "function setBtn(me){btn=1}\n"
-   "function clrBtn(me){btn=0}\n"
-   "function mMove(me){\n"
-   " if(btn){\n"
-   "   dispIdx+=me.movementX*zoom\n"
-   "   if(dispIdx<0) dispIdx=0\n"
-   " }\n"
-   "}\n"
-   "\n"
-   "function startWS(){\n"
-   "draw_bar(0,false)\n"
-   "draw_chart()\n"
-   "document.getElementById('chart').addEventListener(\"wheel\", onWheel)\n"
-   "document.getElementById('chart').addEventListener(\"mousedown\", setBtn)\n"
-   "document.getElementById('chart').addEventListener(\"mouseup\", clrBtn)\n"
-   "document.getElementById('chart').addEventListener(\"mousemove\", mMove)\n"
-   "\n"
-   "ws=new WebSocket(\"ws://\"+window.location.host+\"/ws\")\n"
-   "//ws=new WebSocket(\"ws://192.168.0.111/ws\")\n"
-   "ws.onopen=function(evt){}\n"
-   "ws.onclose=function(evt){alert(\"Connection closed.\");}\n"
-   "ws.onmessage=function(evt){\n"
-   "// console.log(evt.data)\n"
-   " lines = evt.data.split(';')\n"
-   " event=lines[0]\n"
-   " data=lines[1]\n"
-   " if(event == 'settings')\n"
-   " {\n"
-   " d=JSON.parse(data)\n"
-   " oledon=d.o\n"
-   " a.OLED.value=oledon?'ON ':'OFF'\n"
-   " rate=d.r\n"
-   " showRate()\n"
-   " }\n"
-   " else if(event == 'state')\n"
-   " {\n"
-   "d=JSON.parse(data)\n"
-   "dt=new Date(d.t*1000)\n"
-   "tk=+d.tk\n"
-   "if(tk<10) tk=' '+tk+'&nbsp;'\n"
-   "a.time.innerHTML=dt.toLocaleString()+'.'+tk\n"
-   "a.value.innerHTML=d.v\n"
-   "a.unit.innerHTML=fixLabel(d.u)\n"
-   "if(typeof(d.vlt)!='undefined')\n"
-   "{\n"
-   " a.batt.innerHTML=d.vlt.toFixed(2)+'V'\n"
-   " a.batt.setAttribute('style',d.vlt<=3.6?'color:red':'')\n"
-   "}\n"
-   "a.v1.innerHTML=(typeof(d.v1)!='undefined')?d.v1:''\n"
-   "st=parseInt(d.st, 16)\n"
-   "if(st&(1<<6))\n"
-   "a.v1.setAttribute('style',d.v1=='FAIL'?'color:red':'color:green')\n"
-   "a.v2.innerHTML=(typeof(d.v2)!='undefined')?d.v2:''\n"
-   "a.v3.innerHTML=(typeof(d.v3)!='undefined')?d.v3:''\n"
-   "if(st&1){\n"
-   " aa=[dt,+d.bv,+d.v1,+d.v2,+d.v3]\n"
-   " va.push(aa)\n"
-   "}\n"
-   "mm=d.mm.split(',')\n"
-   "min=+mm[0]\n"
-   "max=+mm[1]\n"
-   "mod=+mm[2]\n"
-   "if(mod){\n"
-   "a.bar.setAttribute('style','')\n"
-   "draw_bar(d.bv, d.v=='0L'?true:false)\n"
-   "}else a.bar.setAttribute('style','display:none')\n"
-   "draw_chart()\n"
-   "\n"
-   "if(st!=lastst){\n"
-   "a.am.innerHTML=(st&(1<<4))?\"AUTO\":\"MANUAL\"\n"
-   "a.h.innerHTML=(st&(1<<5))?\"HOLD\":\"\"\n"
-   "if(st&(1<<3)) a.imag.src = 'diode.png'\n"
-   "else if(st&(1<<2)) a.imag.src = 'beep.png'\n"
-   "else a.imag.src = ''\n"
-   "a.record.value=(st&(1<<8))?\"Stop\":\"Record\"\n"
-   "recording=(st&(1<<8))?true:false\n"
-   "lastst=st\n"
-   "}\n"
-   "if(st&(1<<11)){ //MM\n"
-   "a.t1.innerHTML=v2t(+d.t1)\n"
-   "a.t2.innerHTML=v2t(+d.t2)\n"
-   "a.t3.innerHTML=v2t(+d.t3)\n"
-   "}\n"
-   "else if(st&(1<<7)){ //Peak\n"
-   "a.pm.innerHTML=\"PeakMax\"\n"
-   "a.t1.innerHTML=\"PeakMin\"\n"
-   "}\n"
-   " }\n"
-   " else if(event == 'alert')\n"
-   " {\n"
-   "  alert(data)\n"
-   " }\n"
-   " else if(event == 'print')\n"
-   " {\n"
-   "  a.status.innerHTML=data\n"
-   "  console.log(data)\n"
-   " }\n"
-   " else if(event == 'range')\n"
-   " {\n"
-   "  a.status.innerHTML=''\n"
-   "  d=JSON.parse(data)\n"
-   "  for(i=0;i<3;i++){\n"
-   "   item=document.getElementById('s'+i)\n"
-   "   item.setAttribute('style',i<d.s.length?'':'display:none')\n"
-   "//   if(i==idx) item.setAttribute('style','background-color:red')\n"
-   "   item.innerHTML=d.s[i]\n"
-   "  }\n"
-   "  for(i=0;i<9;i++){\n"
-   "   item=document.getElementById('r'+i)\n"
-   "   item.setAttribute('style',i<d.r.length?'':'display:none')\n"
-   "//   if(i==idx) item.setAttribute('style','background-color:red')\n"
-   "   item.innerHTML=d.r[i]\n"
-   "  }\n"
-   "  for(i=0;i<6;i++){\n"
-   "   item=document.getElementById('o'+i)\n"
-   "   item.setAttribute('style',i<d.o.length?'':'display:none')\n"
-   "//   if(i==idx) item.setAttribute('style','background-color:red')\n"
-   "   item.innerHTML=d.o[i]\n"
-   "  }\n"
-   "  a.v1.setAttribute('style','')\n"
-   "  a.u1.innerHTML=(d.u.length)?fixLabel(d.u[0]):''\n"
-   "  a.u2.innerHTML=(d.u.length>1)?fixLabel(d.u[1]):''\n"
-   "  a.u3.innerHTML=(d.u.length>2)?fixLabel(d.u[2]):''\n"
-   "  a.mm.innerHTML=(d.l.length)?d.l[0]:''\n"
-   "  a.l1.innerHTML=(d.l.length>1)?d.l[1]:''\n"
-   "  a.l2.innerHTML=(d.l.length>1)?d.l[2]:''\n"
-   "  a.l3.innerHTML=(d.l.length>2)?d.l[3]:''\n"
-   "  a.t1.innerHTML=''\n"
-   "  a.t2.innerHTML=''\n"
-   "  a.t3.innerHTML=''\n"
-   "  a.pm.innerHTML=''\n"
-   " }\n"
-   "}\n"
-   "}\n"
-   "\n"
-   "function fixLabel(s)\n"
-   "{\n"
-   "  s=String(s).replace(/~/g, '\\u03A9')\n"
-   "  return s.replace(/@/g, '\xB0')\n"
-   "}\n"
-   "\n"
-   "function v2t(v)\n"
-   "{\n"
-   "s=v%60\n"
-   "if(s<9) s='0'+s\n"
-   "v/=60\n"
-   "m=(v%60).toFixed()\n"
-   "if(m<9) m='0'+m\n"
-   "v/=60\n"
-   "h=v.toFixed()\n"
-   "return h+':'+m+':'+s\n"
-   "}\n"
-   "function setVar(varName, value)\n"
-   "{\n"
-   " ws.send('cmd;{\"'+varName+'\":'+value+'}')\n"
-   "}\n"
-   "function setA(n)\n"
-   "{\n"
-   " setVar('range',n)\n"
-   "}\n"
-   "function setSel(n)\n"
-   "{\n"
-   " setVar('sel',n)\n"
-   "}\n"
-   "function setOpt(n)\n"
-   "{\n"
-   " setVar('opt',n)\n"
-   "}\n"
-   "function oled(){\n"
-   "oledon=!oledon\n"
-   "setVar('oled', oledon)\n"
-   "a.OLED.value=oledon?'ON ':'OFF'\n"
-   "}\n"
-   "\n"
-   "function draw_bar(v,zl){\n"
-   "try{\n"
-   "var c2 = document.getElementById('bar')\n"
-   "ctx=c2.getContext(\"2d\")\n"
-   "ctx.fillStyle=\"#000\";\n"
-   "ctx.fillRect(0,0,c2.width,c2.height)\n"
-   "ctx.fillStyle=\"#FFF\";\n"
-   "ctx.lineWidth=1\n"
-   "ctx.strokeStyle=\"#FFF\"\n"
-   "ctx.font=\"bold 10px sans-serif\";\n"
-   "\n"
-   "w=c2.width-30\n"
-   "  \n"
-   "for(i=0;i<=60;i++)\n"
-   "{\n"
-   "fVal=(i*(max-min)/60)+min\n"
-   "x=i/60*w+12\n"
-   "if((i%mod)==0)\n"
-   "{\n"
-   "ctx.fillText(fVal.toFixed(), x-(String(fVal.toFixed()).length/2)*5, 10)\n"
-   "ctx.beginPath()\n"
-   "    ctx.moveTo(x, 15);\n"
-   "    ctx.lineTo(x, 24);\n"
-   "}\n"
-   "else\n"
-   "{\n"
-   "ctx.beginPath()\n"
-   "    ctx.moveTo(x, 18);\n"
-   "    ctx.lineTo(x, 24);\n"
-   "}\n"
-   "ctx.stroke()\n"
-   "}\n"
-   "\n"
-   "if(min<0)\n"
-   "{\n"
-   "c=w>>1\n"
-   "x=v/max*c\n"
-   "ctx.fillStyle = \"#FFF\";\n"
-   "if(x<0)\n"
-   "{\n"
-   "if(x<-c) x=-c\n"
-   "ctx.fillRect(12+c+x, 30, -x, 6);\n"
-   "}\n"
-   "else\n"
-   "{\n"
-   "if(x>c) x=c\n"
-   "ctx.fillRect(12+c, 30, x, 6);\n"
-   "}\n"
-   "ctx.fillStyle = \"#F00\";\n"
-   "ctx.fillRect(12+c+x, 30, 1, 6);\n"
-   "}\n"
-   "else // unsigned\n"
-   "{\n"
-   "x = v/max*w\n"
-   "if(x>w || zl) x=w\n"
-   "ctx.fillStyle = \"#FFF\";\n"
-   "ctx.fillRect(12, 30, x, 6);\n"
-   "ctx.fillStyle = \"#F00\";\n"
-   "ctx.fillRect(12+x, 30, 1, 6);\n"
-   "}\n"
-   "}catch(err){}\n"
-   "}\n"
-   "function draw_chart(){\n"
-   "try {\n"
-   "var c=document.getElementById('chart')\n"
-   "ctx=c.getContext(\"2d\")\n"
-   "while(va.length>65500) va.shift()\n"
-   "ctx.fillStyle=\"#222\"\n"
-   "ctx.fillRect(0,0,c.width,c.height)\n"
-   "ctx.fillStyle=\"#FFF\"\n"
-   "ctx.lineWidth=1\n"
-   "ctx.font=\"bold 10px sans-serif\"\n"
-   "ctx.textAlign=\"right\"\n"
-   "bd=10\n"
-   "h=c.height-60\n"
-   "if(min<0){\n"
-   "base=h/2\n"
-   "range=h/2\n"
-   "}else{\n"
-   "base=h\n"
-   "range=h\n"
-   "}\n"
-   "base+=bd\n"
-   "fVal=min\n"
-   "for(i=6;i>=0;i--)\n"
-   "{\n"
-   "y=(i/6*h)+bd\n"
-   "ctx.strokeStyle=\"#FFF\"\n"
-   "ctx.fillText(fVal,20,y+3)\n"
-   "fVal+=(max-min)/6\n"
-   "ctx.strokeStyle=\"#555\"\n"
-   "ctx.beginPath()\n"
-   "    ctx.moveTo(21,y)\n"
-   "    ctx.lineTo(c.width,y)\n"
-   "ctx.stroke()\n"
-   "}\n"
-   "\n"
-   "ctx.strokeStyle = \"#555\"\n"
-   "m=0\n"
-   "ctx.font=\"10px sans-serif\"\n"
-   "ctx.fillText(zoom,c.width-1,10)\n"
-   "for(i=va.length-1-dispIdx,x=c.width-1;x>20&&i>=0;i-=zoom,x--)\n"
-   "{\n"
-   "if(x%100==21)\n"
-   "{\n"
-   "ctx.beginPath()\n"
-   "    ctx.moveTo(x,h+bd)\n"
-   "    ctx.lineTo(x,bd)\n"
-   "ctx.stroke()\n"
-   "ctx.save()\n"
-   "ctx.translate(x+30, h+60)\n"
-   "ctx.rotate(0.9)\n"
-   "ctx.fillText(va[i][0].toLocaleTimeString(),0,0)\n"
-   "ctx.restore()\n"
-   "}\n"
-   "}\n"
-   "\n"
-   "ciel=max\n"
-   "colors=[0,'#FFF','#00F','#0F0','#FF0','#0FF']\n"
-   "for(line=4;line>0;line--)\n"
-   "{\n"
-   "start=0\n"
-   "ctx.strokeStyle=colors[line]\n"
-   "for(i=va.length-1-dispIdx,x=c.width-1;x>20&&i>=0;i-=zoom,x--)\n"
-   "{\n"
-   "  if(typeof(va[i][line])!='undefined'){\n"
-   "v0=va[i][line]\n"
-   "y=base-(v0/ciel*range)\n"
-   "if(!start){start=1;ctx.beginPath();ctx.moveTo(c.width-1,y)}\n"
-   "else if(start)\n"
-   "{\n"
-   "if(zoom>1)\n"
-   "{\n"
-   "min=max=y\n"
-   "for(j=i+1;j<i+zoom;j++)\n"
-   "{\n"
-   "y=base-(va[j][line]/ciel*range)\n"
-   "if(y<min) min=y\n"
-   "if(y>max) max=y\n"
-   "}\n"
-   "if(min<y) ctx.lineTo(x,min)\n"
-   "if(max>y) ctx.lineTo(x,max)\n"
-   "}\n"
-   "ctx.lineTo(x,y)\n"
-   "}\n"
-   "  }\n"
-   "  else if(start){ctx.stroke();start=0;}\n"
-   "}\n"
-   "if(start)ctx.stroke()\n"
-   "}\n"
-   "}catch(err){}\n"
-   "}\n"
-   "\n"
-   "function openRec()\n"
-   "{\n"
-   " if(recording)\n"
-   "setVar('stop',0)\n"
-   " else\n"
-   "document.getElementById('rec').style.display=\"inline-block\";\n"
-   "}\n"
-   "function startRec()\n"
-   "{\n"
-   " document.getElementById('rec').style.display=\"none\"\n"
-   " dur=a.duration.value\n"
-   " if(dur==0) dur=60\n"
-   " ws.send('cmd;{\"name\":\"'+a.name.value+'\",\"interval\":\"'+a.interval.value+'\",\"sav\":\"'+dur+'\"}')\n"
-   "}\n"
-   "function cancelRec()\n"
-   "{\n"
-   " document.getElementById('rec').style.display=\"none\";\n"
-   "}\n"
-   "function chgRate()\n"
-   "{\n"
-   " if(++rate>8) rate=0\n"
-   " setVar('rate',rate)\n"
-   " showRate()\n"
-   "}\n"
-   "function showRate(){\n"
-   " rates=['100ms','200ms','500ms','1 sec','2 sec','5 sec','10sec','30sec',' 1 min']\n"
-   " a.rate.value=rates[rate]\n"
-   "}\n"
-   "function beep() {\n"
-   "    var snd = new Audio(\"data:audio/wav;base64,//uQRAAAAWMSLwUIYAAsYkXgoQwAEaYLWfkWgAI0wWs/ItAAAGDgYtAgAyN+QWaAAihwMWm4G8QQRDiMcCBcH3Cc+CDv/7xA4Tvh9Rz/y8QADBwMWgQAZG/ILNAARQ4GLTcDeIIIhxGOBAuD7hOfBB3/94gcJ3w+o5/5eIAIAAAVwWgQAVQ2ORaIQwEMAJiDg95G4nQL7mQVWI6GwRcfsZAcsKkJvxgxEjzFUgfHoSQ9Qq7KNwqHwuB13MA4a1q/DmBrHgPcmjiGoh//EwC5nGPEmS4RcfkVKOhJf+WOgoxJclFz3kgn//dBA+ya1GhurNn8zb//9NNutNuhz31f////9vt///z+IdAEAAAK4LQIAKobHItEIYCGAExBwe8jcToF9zIKrEdDYIuP2MgOWFSE34wYiR5iqQPj0JIeoVdlG4VD4XA67mAcNa1fhzA1jwHuTRxDUQ//iYBczjHiTJcIuPyKlHQkv/LHQUYkuSi57yQT//uggfZNajQ3Vmz+Zt//+mm3Wm3Q576v////+32///5/EOgAAADVghQAAAAA//uQZAUAB1WI0PZugAAAAAoQwAAAEk3nRd2qAAAAACiDgAAAAAAABCqEEQRLCgwpBGMlJkIz8jKhGvj4k6jzRnqasNKIeoh5gI7BJaC1A1AoNBjJgbyApVS4IDlZgDU5WUAxEKDNmmALHzZp0Fkz1FMTmGFl1FMEyodIavcCAUHDWrKAIA4aa2oCgILEBupZgHvAhEBcZ6joQBxS76AgccrFlczBvKLC0QI2cBoCFvfTDAo7eoOQInqDPBtvrDEZBNYN5xwNwxQRfw8ZQ5wQVLvO8OYU+mHvFLlDh05Mdg7BT6YrRPpCBznMB2r//xKJjyyOh+cImr2/4doscwD6neZjuZR4AgAABYAAAABy1xcdQtxYBYYZdifkUDgzzXaXn98Z0oi9ILU5mBjFANmRwlVJ3/6jYDAmxaiDG3/6xjQQCCKkRb/6kg/wW+kSJ5//rLobkLSiKmqP/0ikJuDaSaSf/6JiLYLEYnW/+kXg1WRVJL/9EmQ1YZIsv/6Qzwy5qk7/+tEU0nkls3/zIUMPKNX/6yZLf+kFgAfgGyLFAUwY//uQZAUABcd5UiNPVXAAAApAAAAAE0VZQKw9ISAAACgAAAAAVQIygIElVrFkBS+Jhi+EAuu+lKAkYUEIsmEAEoMeDmCETMvfSHTGkF5RWH7kz/ESHWPAq/kcCRhqBtMdokPdM7vil7RG98A2sc7zO6ZvTdM7pmOUAZTnJW+NXxqmd41dqJ6mLTXxrPpnV8avaIf5SvL7pndPvPpndJR9Kuu8fePvuiuhorgWjp7Mf/PRjxcFCPDkW31srioCExivv9lcwKEaHsf/7ow2Fl1T/9RkXgEhYElAoCLFtMArxwivDJJ+bR1HTKJdlEoTELCIqgEwVGSQ+hIm0NbK8WXcTEI0UPoa2NbG4y2K00JEWbZavJXkYaqo9CRHS55FcZTjKEk3NKoCYUnSQ0rWxrZbFKbKIhOKPZe1cJKzZSaQrIyULHDZmV5K4xySsDRKWOruanGtjLJXFEmwaIbDLX0hIPBUQPVFVkQkDoUNfSoDgQGKPekoxeGzA4DUvnn4bxzcZrtJyipKfPNy5w+9lnXwgqsiyHNeSVpemw4bWb9psYeq//uQZBoABQt4yMVxYAIAAAkQoAAAHvYpL5m6AAgAACXDAAAAD59jblTirQe9upFsmZbpMudy7Lz1X1DYsxOOSWpfPqNX2WqktK0DMvuGwlbNj44TleLPQ+Gsfb+GOWOKJoIrWb3cIMeeON6lz2umTqMXV8Mj30yWPpjoSa9ujK8SyeJP5y5mOW1D6hvLepeveEAEDo0mgCRClOEgANv3B9a6fikgUSu/DmAMATrGx7nng5p5iimPNZsfQLYB2sDLIkzRKZOHGAaUyDcpFBSLG9MCQALgAIgQs2YunOszLSAyQYPVC2YdGGeHD2dTdJk1pAHGAWDjnkcLKFymS3RQZTInzySoBwMG0QueC3gMsCEYxUqlrcxK6k1LQQcsmyYeQPdC2YfuGPASCBkcVMQQqpVJshui1tkXQJQV0OXGAZMXSOEEBRirXbVRQW7ugq7IM7rPWSZyDlM3IuNEkxzCOJ0ny2ThNkyRai1b6ev//3dzNGzNb//4uAvHT5sURcZCFcuKLhOFs8mLAAEAt4UWAAIABAAAAAB4qbHo0tIjVkUU//uQZAwABfSFz3ZqQAAAAAngwAAAE1HjMp2qAAAAACZDgAAAD5UkTE1UgZEUExqYynN1qZvqIOREEFmBcJQkwdxiFtw0qEOkGYfRDifBui9MQg4QAHAqWtAWHoCxu1Yf4VfWLPIM2mHDFsbQEVGwyqQoQcwnfHeIkNt9YnkiaS1oizycqJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=\");\n"
-   "    snd.play();\n"
-   "}\n"
-   "</script>\n"
-   "<body bgcolor=\"black\" text=\"silver\"  onload=\"{startWS()}\">\n"
-   "<div>\n"
-   "<table align=center width=370>\n"
-   "<tr align=center><td><div id=\"batt\" style=\"font-size:small\"> 0.00V</div></td><td><button id=\"time\" onclick=\"setVar('sclk',0)\">0:00:00 AM.0</button>\n"
-   "</td><td colspan=2><div style=\"font-size:large\">WiFi UT181A</div></td></tr>\n"
-   "<tr align=center><td width=50><td><div id=\"mm\" width=60></div></td><td width=50><div id=\"h\"></div></td><td width=70><div id=\"am\">AUTO</div></td></tr>\n"
-   "</table>\n"
-   "<table align=center width=370>\n"
-   "<tr align=center><td width=150 align=\"right\" colspan=2><div id=\"value\" style=\"font-size:xx-large\">0L</div></td><td><div id=\"unit\">DCV</div></td>\n"
-   "<td><div id=\"pm\"></div><img id=\"imag\" src='' style=\"width:38px\"></td></tr>\n"
-   "<tr><td colspan=4><canvas id=\"bar\" width=\"360\" height=\"40\" style=\"float:center\"></td></tr>\n"
-   "<tr><td><div id=\"l1\"></div></td><td align=\"right\"><div id=\"v1\"></div></td><td><div id=\"u1\" align=\"center\"></div></td><td align=\"right\"><div id=\"t1\" align=\"center\"></div></td></tr>\n"
-   "<tr><td><div id=\"l2\"></div></td><td align=\"right\"><div id=\"v2\"></div></td><td><div id=\"u2\" align=\"center\"></div></td><td align=\"right\"><div id=\"t2\" align=\"center\"></div></td></tr>\n"
-   "<tr><td><div id=\"l3\"></div></td><td align=\"right\"><div id=\"v3\"></div></td><td><div id=\"u3\" align=\"center\"></div></td><td align=\"right\"><div id=\"t3\" align=\"center\"></div></td></tr>\n"
-   "<tr><td colspan=4><input type=\"button\" value=\"Hold \" id=\"hold\" onClick=\"{setVar('hold', 0)}\">\n"
-   "<div class=\"dropdown\">\n"
-   "  <button class=\"dropbtn\">Select</button>\n"
-   "  <div class=\"dropdown-content\">\n"
-   "  <button class=\"btn\" id=\"s0\" onclick=\"setSel(1)\">Ohms</button>\n"
-   "  <button class=\"btn\" id=\"s1\" onclick=\"setSel(2)\">Beep</button>\n"
-   "  <button class=\"btn\" id=\"s2\" onclick=\"setSel(3)\">nS</button>\n"
-   "  </div>\n"
-   "</div>\n"
-   "<div class=\"dropdown\">\n"
-   "  <button class=\"dropbtn\">Range</button>\n"
-   "  <div class=\"dropdown-content\">\n"
-   "  <button class=\"btn\" id=\"r0\" onclick=\"setA(0)\">Auto</button>\n"
-   "  <button class=\"btn\" id=\"r1\" onclick=\"setA(1)\">6</button>\n"
-   "  <button class=\"btn\" id=\"r2\" onclick=\"setA(2)\">60</button>\n"
-   "  <button class=\"btn\" id=\"r3\" onclick=\"setA(3)\">600</button>\n"
-   "  <button class=\"btn\" id=\"r4\" onclick=\"setA(4)\">6000</button>\n"
-   "  <button class=\"btn\" id=\"r5\" onclick=\"setA(5)\">10000</button>\n"
-   "  <button class=\"btn\" id=\"r6\" onclick=\"setA(6)\"></button>\n"
-   "  <button class=\"btn\" id=\"r7\" onclick=\"setA(7)\"></button>\n"
-   "  <button class=\"btn\" id=\"r8\" onclick=\"setA(8)\"></button>\n"
-   "  </div>\n"
-   "</div>\n"
-   "<div class=\"dropdown\">\n"
-   "  <button class=\"dropbtn\">Option</button>\n"
-   "  <div class=\"dropdown-content\">\n"
-   "  <button class=\"btn\" id=\"o0\" onclick=\"setOpt(0)\">Opt</button>\n"
-   "  <button class=\"btn\" id=\"o1\" onclick=\"setOpt(1)\">0</button>\n"
-   "  <button class=\"btn\" id=\"o2\" onclick=\"setOpt(2)\">0</button>\n"
-   "  <button class=\"btn\" id=\"o3\" onclick=\"setOpt(3)\">0</button>\n"
-   "  <button class=\"btn\" id=\"o4\" onclick=\"setOpt(4)\">0</button>\n"
-   "  <button class=\"btn\" id=\"o5\" onclick=\"setOpt(5)\"></button>\n"
-   "  </div>\n"
-   "</div>\n"
-   "<input type=\"button\" value=\"REL\" id=\"REL\" onClick=\"{setVar('rel', 0)}\">\n"
-   "<input id='rval' type=text size=5 value='0'> &nbsp<input type=\"button\" value=\"M/M\" id=\"M/M\" onClick=\"{setVar('mm', 0)}\"></td></tr>\n"
-   "<tr><td colspan=4><canvas id=\"chart\" width=\"360\" height=\"360\" style=\"float:center\"></td></tr>\n"
-   "<tr><td colspan=4><div id=\"rec\"><div id=\"popupRec\">\n"
-   "<h2>Record</h2>\n"
-   "<table width=\"100\">\n"
-   "<tr><td>Name: <input id=\"name\" name=\"name\" placeholder=\"REC_1\" type=\"text\" size=\"10\"></td></tr>\n"
-   "<tr><td>Interval:<input id=\"interval\" name=\"interval\" placeholder=\"1\" type=\"text\" size=\"10\"></td></tr>\n"
-   "<tr><td>Duration:<input id=\"duration\" name=\"duration\" placeholder=\"60\" type=\"text\" size=\"10\"></td></tr>\n"
-   "<tr><td><input type=\"button\" id=\"close\" value=\"Cancel\" onclick =\"cancelRec()\"><input type=\"button\" id=\"start\" value=\"Start\" onclick =\"startRec()\"></td></tr>\n"
-   "</table>\n"
-   "</div>\n"
-   "</div>\n"
-   "</td>\n"
-   "</tr>\n"
-   "<tr><td colspan=4>OLED<input type=\"button\" value=\"OFF\" id=\"OLED\" onClick=\"{oled()}\"><input type=\"button\" value=\"Save\" onClick=\"{setVar('sav', 0)}\">\n"
-   "<input type=\"button\" id=\"record\" value=\"Record\" onClick=\"{openRec()}\"><input type=\"submit\" value=\"Files\" onClick=\"window.location='/files.html';\">\n"
-   "<input type=\"button\" value=\"100ms\" id=\"rate\" onClick=\"{chgRate()}\"> <input type=\"submit\" value=\"Setup\" onClick=\"window.location='/s';\"></td></tr>\n"
-   "<tr><td colspan=4> <div id=\"status\"></div></td></tr>\n"
-   "</table>\n"
-   "</div>\n"
-   "</body>\n";
+const char page1[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>WiFi UT181A</title>
+<style type="text/css">
+input{
+border-radius: 5px;
+margin-bottom: 5px;
+box-shadow: 2px 2px 12px #000000;
+background-image: -moz-linear-gradient(top, #ffffff, #50a0ff);
+background-image: -ms-linear-gradient(top, #ffffff, #50a0ff);
+background-image: -o-linear-gradient(top, #ffffff, #50a0ff);
+background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);
+background-image: linear-gradient(top, #ffffff, #50a0ff);
+background-clip: padding-box;
+}
+body{width:340px;font-family: Arial, Helvetica, sans-serif; overflow:hidden;}
+.range{
+  overflow: hidden;
+}
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+.dropbtn {
+    background-color: #50a0ff;
+    padding: 1px;
+    font-size: 12px;
+  background-image: -webkit-linear-gradient(top, #efa0b0, #50a0ff);
+  border-radius: 5px;
+  margin-bottom: 5px;
+  box-shadow: 2px 2px 12px #000000;
+}
+.btn {
+    background-color: #50a0ff;
+    padding: 1px;
+    font-size: 12px;
+    min-width: 50px;
+    border: none;
+}
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: #919191;
+    min-width: 40px;
+    min-height: 1px;
+    z-index: 1;
+}
+.dropdown:hover .dropdown-content {display: block;}
+.dropdown:hover .dropbtn {background-color: #3e8e41;}
+.dropdown:hover .btn {  background-image: -webkit-linear-gradient(top, #efffff, #a0a0ff);}
+#rec{
+opacity:.9;
+display:none;
+top:300px;
+left:150px;
+position:absolute;
+background-color:#A13131;
+overflow:auto;
+z-index:1;
+}
+</style>
+<script type="text/javascript">
+a=document.all
+oledon=0;v=0;min=-60;max=60;mod=5;st=0;lastst=0;rate=0
+zoom=1;btn=0;dispIdx=0
+va=new Array()
+function onWheel(we){
+  if(we.deltaY>0) zoom++
+  else if(zoom>1) zoom--
+}
+function setBtn(me){btn=1}
+function clrBtn(me){btn=0}
+function mMove(me){
+ if(btn){
+   dispIdx+=me.movementX*zoom
+   if(dispIdx<0) dispIdx=0
+ }
+}
 
-const char files_html[] PROGMEM =
-   "<!DOCTYPE html>\n"
-   "<html lang=\"en\">\n"
-   "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>\n"
-   "<title>WiFi UT181A Web Page</title>\n"
-   "<style type=\"text/css\">\n"
-   "input{\n"
-   "border-radius: 5px;\n"
-   "margin-bottom: 5px;\n"
-   "box-shadow: 2px 2px 12px #000000;\n"
-   "background-image: -moz-linear-gradient(top, #ffffff, #50a0ff);\n"
-   "background-image: -ms-linear-gradient(top, #ffffff, #50a0ff);\n"
-   "background-image: -o-linear-gradient(top, #ffffff, #50a0ff);\n"
-   "background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);\n"
-   "background-image: linear-gradient(top, #ffffff, #50a0ff);\n"
-   "background-clip: padding-box;\n"
-   "}\n"
-   "body{width:340px;font-family: Arial, Helvetica, sans-serif;}\n"
-   ".btn {\n"
-   "    background-color: #50a0ff;\n"
-   "    padding: 1px;\n"
-   "    font-size: 12px;\n"
-   "    min-width: 56px;\n"
-   "    border: none;\n"
-   "}\n"
-   "</style>\n"
-   "<script type=\"text/javascript\">\n"
-   "a=document.all\n"
-   "function startWS(){\n"
-   "ws=new WebSocket(\"ws://\"+window.location.host+\"/ws\")\n"
-   "//ws=new WebSocket(\"ws://192.168.0.111/ws\")\n"
-   "ws.onopen=function(evt){}\n"
-   "ws.onclose=function(evt){alert(\"Connection closed.\");}\n"
-   "ws.onmessage=function(evt){\n"
-   " lines = evt.data.split(';')\n"
-   " event=lines[0]\n"
-   " data=lines[1]\n"
-   " \n"
-   " if(event == 'settings')\n"
-   " {\n"
-   "getFiles('rec',0);\n"
-   " }\n"
-   " else if(event == 'state')\n"
-   " {\n"
-   "d=JSON.parse(data)\n"
-   "dt=new Date(d.t*1000)\n"
-   "a.time.innerHTML=dt.toLocaleTimeString()+'.'+((d.t%1)*10).toFixed()\n"
-   "a.status.innerHTML=d.v+' '+fixLabel(d.u)\n"
-   " }\n"
-   " else if(event == 'alert')\n"
-   " {\n"
-   "  alert(data)\n"
-   " }\n"
-   " else if(event == 'record')\n"
-   " {\n"
-   "  d=JSON.parse(data)\n"
-   "  listArr.push(d.a)\n"
-   "  AddFile(1,d.a)\n"
-   " }\n"
-   " else if(event == 'save')\n"
-   " {\n"
-   "  d=JSON.parse(data)\n"
-   "  listArr.push(d.a)\n"
-   "  AddFile(0,d.a)\n"
-   " }\n"
-   " else if(event == 'print')\n"
-   " {\n"
-   "a.status.innerHTML=data\n"
-   " console.log(data)\n"
-   " }else if(event == 'chunk')\n"
-   " {\n"
-   "  fileData.push(data)\n"
-   "  a.status.innerHTML=\"Downloading \"+fileData.length\n"
-   " }\n"
-   " else if(event == 'finish')\n"
-   " {\n"
-   "a.status.innerHTML=\"Done\";\n"
-   "var file;\n"
-   "var properties={type: 'text/plain'}\n"
-   "try {\n"
-   "  file=new File(fileData,fileName,properties)\n"
-   "}catch(e){\n"
-   "  file=new Blob(fileData,properties)\n"
-   "}\n"
-   "l=document.createElement(\"a\")\n"
-   "l.href=URL.createObjectURL(file)\n"
-   "l.download=fileName\n"
-   "document.body.appendChild(l)\n"
-   "l.click()\n"
-   "setTimeout(function(){\n"
-   "document.body.removeChild(l)\n"
-   "window.URL.revokeObjectURL(l.href)\n"
-   "},0)\n"
-   " }\n"
-   "}\n"
-   "}\n"
-   "function dload(idx)\n"
-   "{\n"
-   "  fileData=[]\n"
-   "  fileName=listArr[idx][0]+'.txt'\n"
-   "  ws.send('cmd;{\"name\":\"'+listArr[idx][2]+'\",\"int\":\"'+listArr[idx][3]+'\",\"file\":'+idx+'}')\n"
-   "}\n"
-   "function getsnap(idx)\n"
-   "{\n"
-   "  ws.send('cmd;{\"snap\":'+idx+'}')\n"
-   "}\n"
-   "function delfile(idx)\n"
-   "{\n"
-   "  ws.send('cmd;{\"delf\":'+idx+'}')\n"
-   "  l=document.getElementById('tbody'+idx)\n"
-   "  a.list.removeChild(l)\n"
-   "}\n"
-   "function delsnap(idx)\n"
-   "{\n"
-   "  ws.send('cmd;{\"dels\":'+idx+'}')\n"
-   "  l=document.getElementById('tbody'+idx)\n"
-   "  a.list.removeChild(l)\n"
-   "}\n"
-   "\n"
-   "function AddFile(type,arr)\n"
-   "{\n"
-   "  tr=document.createElement(\"tr\")\n"
-   "  td=document.createElement(\"td\")\n"
-   "  inp=document.createElement(\"input\")\n"
-   "  inp.value=arr[0]\n"
-   "  inp.id=idx\n"
-   "  inp.type='image'\n"
-   "  inp.src='del-btn.png'\n"
-   "  if(type)\n"
-   "inp.onclick=function(){delfile(this.id)}\n"
-   "  else\n"
-   "inp.onclick=function(){delsnap(this.id)}\n"
-   "  td.appendChild(inp)\n"
-   "  tr.appendChild(td)\n"
-   "\n"
-   "  td=document.createElement(\"td\")\n"
-   "  inp=document.createElement(\"input\")\n"
-   "  inp.value=arr[0]\n"
-   "  inp.id=idx\n"
-   "  inp.type='button'\n"
-   "  if(type)\n"
-   "inp.onclick=function(){dload(this.id)}\n"
-   "  else\n"
-   "inp.onclick=function(){getsnap(this.id)}\n"
-   "  td.appendChild(inp)\n"
-   "  tr.appendChild(td)\n"
-   "\n"
-   "  for(i=1;i<arr.length;i++){\n"
-   "td=document.createElement(\"td\")\n"
-   "td.appendChild(document.createTextNode(fixLabel(arr[i])))\n"
-   "tr.appendChild(td)\n"
-   "  }\n"
-   "  tbody=document.createElement(\"tbody\")\n"
-   "  tbody.id='tbody'+idx\n"
-   "  tbody.appendChild(tr)\n"
-   "  a.list.appendChild(tbody)\n"
-   "  idx++\n"
-   "}\n"
-   "\n"
-   "function fixLabel(s)\n"
-   "{\n"
-   "  s=String(s).replace(/~/g, '\\u03A9')\n"
-   "  return s.replace(/@/g, '\xB0')\n"
-   "}\n"
-   "\n"
-   "function getFiles(varName)\n"
-   "{\n"
-   " list=document.getElementById(\"list\")\n"
-   " while(list.firstChild)\n"
-   " list.removeChild(list.firstChild)\n"
-   " idx=0\n"
-   " listArr=new Array()\n"
-   " ws.send('cmd;{\"'+varName+'\":0}')\n"
-   "}\n"
-   "</script>\n"
-   "<body bgcolor=\"black\" text=\"silver\"  onload=\"{startWS()}\">\n"
-   "<div><h3 align=\"center\">UT181A Files</h3>\n"
-   "\n"
-   "<table align=center width=440>\n"
-   "<tr align=center><td><div id=\"time\" style=\"font-size:small\"> 0:00:00 AM</div></td><td></td><td></td></tr>\n"
-   "<tr><td><input type=\"button\" value=\"Saves\" onClick=\"{getFiles('svs')}\"></td>\n"
-   "<td><input type=\"button\" value=\"Records\" onClick=\"{getFiles('rec')}\"></td>\n"
-   "<td><div id=\"status\"></div></td></tr>\n"
-   "</table>\n"
-   "&nbsp\n"
-   "<table style=\"font-size:small\" id=\"list\" width=\"550\">\n"
-   "</table>\n"
-   "</div>\n"
-   "</body>\n"
-   "</html>\n";
+function startWS(){
+draw_bar(0,false)
+draw_chart()
+document.getElementById('chart').addEventListener("wheel", onWheel)
+document.getElementById('chart').addEventListener("mousedown", setBtn)
+document.getElementById('chart').addEventListener("mouseup", clrBtn)
+document.getElementById('chart').addEventListener("mousemove", mMove)
+
+ws=new WebSocket("ws://"+window.location.host+"/ws")
+//ws=new WebSocket("ws://192.168.0.117/ws")
+ws.onopen=function(evt){}
+ws.onclose=function(evt){alert("Connection closed.");}
+ws.onmessage=function(evt){
+// console.log(evt.data)
+ lines = evt.data.split(';')
+ event=lines[0]
+ data=lines[1]
+ if(event == 'settings')
+ {
+ d=JSON.parse(data)
+ oledon=d.o
+ a.OLED.value=oledon?'ON ':'OFF'
+ rate=d.r
+ showRate()
+ }
+ else if(event == 'state')
+ {
+  d=JSON.parse(data)
+  dt=new Date(d.t*1000)
+  tk=+d.tk
+  if(tk<10) tk=' '+tk+'&nbsp;'
+  a.time.innerHTML=dt.toLocaleString()+'.'+tk
+  a.value.innerHTML=d.v
+  a.unit.innerHTML=fixLabel(d.u)
+  if(typeof(d.vlt)!='undefined')
+    draw_batt(d.vlt.toFixed(2))
+  a.v1.innerHTML=(typeof(d.v1)!='undefined')?d.v1:''
+  st=parseInt(d.st, 16)
+  if(st&(1<<6))
+    a.v1.setAttribute('style',d.v1=='FAIL'?'color:red':'color:green')
+  a.v2.innerHTML=(typeof(d.v2)!='undefined')?d.v2:''
+  a.v3.innerHTML=(typeof(d.v3)!='undefined')?d.v3:''
+  if(st&1){
+   aa=[dt,+d.bv,+d.v1,+d.v2,+d.v3]
+   va.push(aa)
+  }
+  mm=d.mm.split(',')
+  min=+mm[0]
+  max=+mm[1]
+  mod=+mm[2]
+  if(mod){
+    a.bar.setAttribute('style','')
+    draw_bar(d.bv, d.v=='0L'?true:false)
+  }else a.bar.setAttribute('style','display:none')
+  draw_chart()
+
+  if(st!=lastst){
+    a.am.innerHTML=(st&(1<<4))?"AUTO":"MANUAL"
+    a.h.innerHTML=(st&(1<<5))?"HOLD":""
+    if(st&(1<<3)) a.imag.src = 'diode.png'
+    else if(st&(1<<2)) a.imag.src = 'beep.png'
+    else a.imag.src = ''
+    a.record.value=(st&(1<<8))?"Stop":"Record"
+    recording=(st&(1<<8))?true:false
+    lastst=st
+  }
+  if(st&(1<<11)){ //MM
+    a.t1.innerHTML=v2t(+d.t1)
+    a.t2.innerHTML=v2t(+d.t2)
+    a.t3.innerHTML=v2t(+d.t3)
+  }
+  else if(st&(1<<7)){ //Peak
+    a.pm.innerHTML="PeakMax"
+    a.t1.innerHTML="PeakMin"
+  }
+ }
+ else if(event == 'alert')
+ {
+  alert(data)
+ }
+ else if(event == 'print')
+ {
+  a.status.innerHTML=data
+  console.log(data)
+ }
+ else if(event == 'range')
+ {
+  a.status.innerHTML=''
+  d=JSON.parse(data)
+  for(i=0;i<3;i++){
+   item=document.getElementById('s'+i)
+   item.setAttribute('style',i<d.s.length?'':'display:none')
+//   if(i==idx) item.setAttribute('style','background-color:red')
+   item.innerHTML=d.s[i]
+  }
+  for(i=0;i<9;i++){
+   item=document.getElementById('r'+i)
+   item.setAttribute('style',i<d.r.length?'':'display:none')
+//   if(i==idx) item.setAttribute('style','background-color:red')
+   item.innerHTML=d.r[i]
+  }
+  for(i=0;i<6;i++){
+   item=document.getElementById('o'+i)
+   item.setAttribute('style',i<d.o.length?'':'display:none')
+//   if(i==idx) item.setAttribute('style','background-color:red')
+   item.innerHTML=d.o[i]
+  }
+  a.v1.setAttribute('style','')
+  a.u1.innerHTML=(d.u.length)?fixLabel(d.u[0]):''
+  a.u2.innerHTML=(d.u.length>1)?fixLabel(d.u[1]):''
+  a.u3.innerHTML=(d.u.length>2)?fixLabel(d.u[2]):''
+  a.mm.innerHTML=(d.l.length)?d.l[0]:''
+  a.l1.innerHTML=(d.l.length>1)?d.l[1]:''
+  a.l2.innerHTML=(d.l.length>1)?d.l[2]:''
+  a.l3.innerHTML=(d.l.length>2)?d.l[3]:''
+  a.t1.innerHTML=''
+  a.t2.innerHTML=''
+  a.t3.innerHTML=''
+  a.pm.innerHTML=''
+ }
+}
+}
+
+function fixLabel(s)
+{
+  s=String(s).replace(/~/g, '\\u03A9')
+  return s.replace(/@/g, '\xB0')
+}
+
+function v2t(v)
+{
+s=v%60
+if(s<9) s='0'+s
+v/=60
+m=(v%60).toFixed()
+if(m<9) m='0'+m
+v/=60
+h=v.toFixed()
+return h+':'+m+':'+s
+}
+function setVar(varName, value)
+{
+ ws.send('cmd;{"'+varName+'":'+value+'}')
+}
+function setA(n)
+{
+ setVar('range',n)
+}
+function setSel(n)
+{
+ setVar('sel',n)
+}
+function setOpt(n)
+{
+ setVar('opt',n)
+}
+function oled(){
+oledon=!oledon
+setVar('oled', oledon)
+a.OLED.value=oledon?'ON ':'OFF'
+}
+
+function draw_bar(v,zl){
+try{
+  var c2 = document.getElementById('bar')
+  ctx=c2.getContext("2d")
+  ctx.fillStyle="#000";
+  ctx.fillRect(0,0,c2.width,c2.height)
+  ctx.fillStyle="#FFF";
+  ctx.lineWidth=1
+  ctx.strokeStyle="#FFF"
+  ctx.font="bold 10px sans-serif";
+
+  w=c2.width-30
+  
+  for(i=0;i<=60;i++)
+  {
+    fVal=(i*(max-min)/60)+min
+    x=i/60*w+12
+    if((i%mod)==0)
+    {
+      ctx.fillText(fVal.toFixed(), x-(String(fVal.toFixed()).length/2)*5, 10)
+      ctx.beginPath()
+        ctx.moveTo(x, 15);
+        ctx.lineTo(x, 24);
+    }
+    else
+    {
+      ctx.beginPath()
+        ctx.moveTo(x, 18);
+        ctx.lineTo(x, 24);
+    }
+    ctx.stroke()
+  }
+
+  if(min<0)
+  {
+    c=w>>1
+    x=v/max*c
+    ctx.fillStyle = "#FFF";
+    if(x<0)
+    {
+      if(x<-c) x=-c
+      ctx.fillRect(12+c+x, 30, -x, 6);
+    }
+    else
+    {
+      if(x>c) x=c
+      ctx.fillRect(12+c, 30, x, 6);
+    }
+    ctx.fillStyle = "#F00";
+    ctx.fillRect(12+c+x, 30, 1, 6);
+  }
+  else // unsigned
+  {
+    x = v/max*w
+    if(x>w || zl) x=w
+    ctx.fillStyle = "#FFF";
+    ctx.fillRect(12, 30, x, 6);
+    ctx.fillStyle = "#F00";
+    ctx.fillRect(12+x, 30, 1, 6);
+  }
+}catch(err){}
+}
+function draw_chart(){
+try {
+  var c=document.getElementById('chart')
+  ctx=c.getContext("2d")
+  while(va.length>65500) va.shift()
+  ctx.fillStyle="#222"
+  ctx.fillRect(0,0,c.width,c.height)
+  ctx.fillStyle="#FFF"
+  ctx.lineWidth=1
+  ctx.font="bold 10px sans-serif"
+  ctx.textAlign="right"
+  bd=10
+  h=c.height-60
+  if(min<0){
+    base=h/2
+    range=h/2
+  }else{
+    base=h
+    range=h
+  }
+  base+=bd
+  fVal=min
+  for(i=6;i>=0;i--)
+  {
+    y=(i/6*h)+bd
+    ctx.strokeStyle="#FFF"
+    ctx.fillText(fVal,20,y+3)
+    fVal+=(max-min)/6
+    ctx.strokeStyle="#555"
+    ctx.beginPath()
+      ctx.moveTo(21,y)
+      ctx.lineTo(c.width,y)
+    ctx.stroke()
+  }
+
+  ctx.strokeStyle = "#555"
+  m=0
+  ctx.font="10px sans-serif"
+  ctx.fillText(zoom+':1',c.width-1,10)
+  for(i=va.length-1-dispIdx,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
+  {
+    if(x%100==21)
+    {
+      ctx.beginPath()
+        ctx.moveTo(x,h+bd)
+        ctx.lineTo(x,bd)
+      ctx.stroke()
+      ctx.save()
+      ctx.translate(x+30, h+60)
+      ctx.rotate(0.9)
+      ctx.fillText(va[i][0].toLocaleTimeString(),0,0)
+      ctx.restore()
+    }
+  }
+
+  ciel=max
+  colors=[0,'#FFF','#00F','#0F0','#FF0','#0FF']
+  for(line=4;line>0;line--)
+  {
+    start=0
+    ctx.strokeStyle=colors[line]
+    for(i=va.length-1-dispIdx,x=c.width-1;x>20&&i>=0;i-=zoom,x--)
+    {
+      if(typeof(va[i][line])!='undefined'){
+      v0=va[i][line]
+      y=base-(v0/ciel*range)
+      if(!start){start=1;ctx.beginPath();ctx.moveTo(c.width-1,y)}
+      else if(start)
+      {
+        if(zoom>1)
+        {
+          min=max=y
+          for(j=i+1;j<i+zoom;j++)
+          {
+            y=base-(va[j][line]/ciel*range)
+            if(y<min) min=y
+            if(y>max) max=y
+          }
+          if(min<y) ctx.lineTo(x,min)
+          if(max>y) ctx.lineTo(x,max)
+        }
+        ctx.lineTo(x,y)
+      }
+      }
+      else if(start){ctx.stroke();start=0;}
+    }
+    if(start)ctx.stroke()
+  }
+}catch(err){}
+}
+
+function draw_batt(v){
+try{
+  var c2 = document.getElementById('batt')
+  ctx=c2.getContext("2d")
+  ctx.fillStyle="#000";
+  ctx.fillRect(0,0,c2.width,c2.height)
+  w=c2.width/(4.2-3.6)*(v-3.6)
+  w=Math.max(0,w)
+  ctx.fillStyle="#990";
+  if(w <= 5) ctx.fillStyle="#F00";
+  if(w > c2.width-5) ctx.fillStyle="#0F0";
+  ctx.fillRect(0,0,w,c2.height)
+  ctx.fillStyle=(w==0)?"#F00":"#FFF";
+  ctx.font="bold 16px sans-serif";
+  ctx.fillText(v+'V', (c2.width/2)-(String(v).length/2)*8, 14)
+}catch(err){}
+}
+function openRec()
+{
+ if(recording)
+  setVar('stop',0)
+ else
+  document.getElementById('rec').style.display="inline-block";
+}
+function startRec()
+{
+ document.getElementById('rec').style.display="none"
+ dur=a.duration.value
+ if(dur==0) dur=60
+ ws.send('cmd;{"name":"'+a.name.value+'","interval":"'+a.interval.value+'","sav":"'+dur+'"}')
+}
+function cancelRec()
+{
+ document.getElementById('rec').style.display="none";
+}
+function chgRate()
+{
+ if(++rate>8) rate=0
+ setVar('rate',rate)
+ showRate()
+}
+function showRate(){
+ rates=['100ms','200ms','500ms','1 sec','2 sec','5 sec','10sec','30sec',' 1 min']
+ a.rate.value=rates[rate]
+}
+function beep() {
+    var snd = new Audio("data:audio/wav;base64,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qJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=");
+    snd.play();
+}
+</script>
+<body bgcolor="black" text="silver"  onload="{startWS()}">
+<div>
+<table align=center width=370>
+<tr align=center><td><canvas id="batt" width="50" height="16"></td><td><button id="time" onclick="setVar('sclk',0)">0:00:00 AM.0</button>
+</td><td colspan=2><div style="font-size:large">WiFi UT181A</div></td></tr>
+<tr align=center><td width=50><td><div id="mm" width=60></div></td><td width=50><div id="h"></div></td><td width=70><div id="am">AUTO</div></td></tr>
+</table>
+<table align=center width=370>
+<tr align=center><td width=150 align="right" colspan=2><div id="value" style="font-size:xx-large">0L</div></td><td><div id="unit">DCV</div></td>
+<td><div id="pm"></div><img id="imag" src='' style="width:38px"></td></tr>
+<tr><td colspan=4><canvas id="bar" width="360" height="40" style="float:center"></td></tr>
+<tr><td><div id="l1"></div></td><td align="right"><div id="v1"></div></td><td><div id="u1" align="center"></div></td><td align="right"><div id="t1" align="center"></div></td></tr>
+<tr><td><div id="l2"></div></td><td align="right"><div id="v2"></div></td><td><div id="u2" align="center"></div></td><td align="right"><div id="t2" align="center"></div></td></tr>
+<tr><td><div id="l3"></div></td><td align="right"><div id="v3"></div></td><td><div id="u3" align="center"></div></td><td align="right"><div id="t3" align="center"></div></td></tr>
+<tr><td colspan=4><input type="button" value="Hold " id="hold" onClick="{setVar('hold', 0)}">
+<div class="dropdown">
+  <button class="dropbtn">Select</button>
+  <div class="dropdown-content">
+  <button class="btn" id="s0" onclick="setSel(1)">Ohms</button>
+  <button class="btn" id="s1" onclick="setSel(2)">Beep</button>
+  <button class="btn" id="s2" onclick="setSel(3)">nS</button>
+  </div>
+</div>
+<div class="dropdown">
+  <button class="dropbtn">Range</button>
+  <div class="dropdown-content">
+  <button class="btn" id="r0" onclick="setA(0)">Auto</button>
+  <button class="btn" id="r1" onclick="setA(1)">6</button>
+  <button class="btn" id="r2" onclick="setA(2)">60</button>
+  <button class="btn" id="r3" onclick="setA(3)">600</button>
+  <button class="btn" id="r4" onclick="setA(4)">6000</button>
+  <button class="btn" id="r5" onclick="setA(5)">10000</button>
+  <button class="btn" id="r6" onclick="setA(6)"></button>
+  <button class="btn" id="r7" onclick="setA(7)"></button>
+  <button class="btn" id="r8" onclick="setA(8)"></button>
+  </div>
+</div>
+<div class="dropdown">
+  <button class="dropbtn">Option</button>
+  <div class="dropdown-content">
+  <button class="btn" id="o0" onclick="setOpt(0)">Opt</button>
+  <button class="btn" id="o1" onclick="setOpt(1)">0</button>
+  <button class="btn" id="o2" onclick="setOpt(2)">0</button>
+  <button class="btn" id="o3" onclick="setOpt(3)">0</button>
+  <button class="btn" id="o4" onclick="setOpt(4)">0</button>
+  <button class="btn" id="o5" onclick="setOpt(5)"></button>
+  </div>
+</div>
+<input type="button" value="REL" id="REL" onClick="{setVar('rel', 0)}">
+<input id='rval' type=text size=5 value='0'> &nbsp<input type="button" value="M/M" id="M/M" onClick="{setVar('mm', 0)}"></td></tr>
+<tr><td colspan=4><canvas id="chart" width="360" height="360" style="float:center"></td></tr>
+<tr><td colspan=4><div id="rec"><div id="popupRec">
+<h2>Record</h2>
+<table width="100">
+<tr><td>Name: <input id="name" name="name" placeholder="REC_1" type="text" size="10"></td></tr>
+<tr><td>Interval:<input id="interval" name="interval" placeholder="1" type="text" size="10"></td></tr>
+<tr><td>Duration:<input id="duration" name="duration" placeholder="60" type="text" size="10"></td></tr>
+<tr><td><input type="button" id="close" value="Cancel" onclick ="cancelRec()"><input type="button" id="start" value="Start" onclick ="startRec()"></td></tr>
+</table>
+</div>
+</div>
+</td>
+</tr>
+<tr><td colspan=4>OLED<input type="button" value="OFF" id="OLED" onClick="{oled()}"><input type="button" value="Save" onClick="{setVar('sav', 0)}">
+<input type="button" id="record" value="Record" onClick="{openRec()}"><input type="submit" value="Files" onClick="window.location='/files.html';">
+<input type="button" value="100ms" id="rate" onClick="{chgRate()}"> <input type="submit" value="Setup" onClick="window.location='/s';"></td></tr>
+<tr><td colspan=4> <div id="status"></div></td></tr>
+</table>
+</div>
+</body>
+</html>
+)rawliteral";
+
+const char files_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>WiFi UT181A Web Page</title>
+<style type="text/css">
+input{
+border-radius: 5px;
+margin-bottom: 5px;
+box-shadow: 2px 2px 12px #000000;
+background-image: -moz-linear-gradient(top, #ffffff, #50a0ff);
+background-image: -ms-linear-gradient(top, #ffffff, #50a0ff);
+background-image: -o-linear-gradient(top, #ffffff, #50a0ff);
+background-image: -webkit-linear-gradient(top, #efffff, #50a0ff);
+background-image: linear-gradient(top, #ffffff, #50a0ff);
+background-clip: padding-box;
+}
+body{width:340px;font-family: Arial, Helvetica, sans-serif;}
+.btn {
+    background-color: #50a0ff;
+    padding: 1px;
+    font-size: 12px;
+    min-width: 56px;
+    border: none;
+}
+</style>
+<script type="text/javascript">
+a=document.all
+function startWS(){
+ws=new WebSocket("ws://"+window.location.host+"/ws")
+//ws=new WebSocket("ws://192.168.0.117/ws")
+ws.onopen=function(evt){}
+ws.onclose=function(evt){alert("Connection closed.");}
+ws.onmessage=function(evt){
+ lines = evt.data.split(';')
+ event=lines[0]
+ data=lines[1]
+ 
+ if(event == 'settings')
+ {
+  getFiles('rec',0);
+ }
+ else if(event == 'state')
+ {
+  d=JSON.parse(data)
+  dt=new Date(d.t*1000)
+  a.time.innerHTML=dt.toLocaleTimeString()+'.'+((d.t%1)*10).toFixed()
+  a.status.innerHTML=d.v+' '+fixLabel(d.u)
+  if(typeof(d.vlt)!='undefined')
+    draw_batt(d.vlt.toFixed(2))
+ }
+ else if(event == 'alert')
+ {
+  alert(data)
+ }
+ else if(event == 'record')
+ {
+  d=JSON.parse(data)
+  listArr.push(d.a)
+  AddFile(1,d.a)
+ }
+ else if(event == 'save')
+ {
+  d=JSON.parse(data)
+  listArr.push(d.a)
+  AddFile(0,d.a)
+ }
+ else if(event == 'print')
+ {
+  a.status.innerHTML=data
+  console.log(data)
+ }else if(event == 'chunk')
+ {
+  fileData.push(data)
+  a.status.innerHTML="Downloading "+fileData.length
+ }
+ else if(event == 'finish')
+ {
+  a.status.innerHTML="Done";
+  var file;
+  var properties={type: 'text/plain'}
+  try {
+    file=new File(fileData,fileName,properties)
+  }catch(e){
+    file=new Blob(fileData,properties)
+  }
+  l=document.createElement("a")
+  l.href=URL.createObjectURL(file)
+  l.download=fileName
+  document.body.appendChild(l)
+  l.click()
+  setTimeout(function(){
+    document.body.removeChild(l)
+    window.URL.revokeObjectURL(l.href)
+    },0)
+ }
+}
+}
+function dload(idx)
+{
+  fileData=[]
+  fileName=listArr[idx][0]+'.txt'
+  ws.send('cmd;{"name":"'+listArr[idx][2]+'","int":"'+listArr[idx][3]+'","file":'+idx+'}')
+}
+function getsnap(idx)
+{
+  ws.send('cmd;{"snap":'+idx+'}')
+}
+function delfile(idx)
+{
+  ws.send('cmd;{"delf":'+idx+'}')
+  l=document.getElementById('tbody'+idx)
+  a.list.removeChild(l)
+}
+function delsnap(idx)
+{
+  ws.send('cmd;{"dels":'+idx+'}')
+  l=document.getElementById('tbody'+idx)
+  a.list.removeChild(l)
+}
+
+function AddFile(type,arr)
+{
+  tr=document.createElement("tr")
+  td=document.createElement("td")
+  inp=document.createElement("input")
+  inp.value=arr[0]
+  inp.id=idx
+  inp.type='image'
+  inp.src='del-btn.png'
+  if(type)
+  inp.onclick=function(){delfile(this.id)}
+  else
+  inp.onclick=function(){delsnap(this.id)}
+  td.appendChild(inp)
+  tr.appendChild(td)
+
+  td=document.createElement("td")
+  inp=document.createElement("input")
+  inp.value=arr[0]
+  inp.id=idx
+  inp.type='button'
+  if(type)
+  inp.onclick=function(){dload(this.id)}
+  else
+  inp.onclick=function(){getsnap(this.id)}
+  td.appendChild(inp)
+  tr.appendChild(td)
+
+  for(i=1;i<arr.length;i++){
+  td=document.createElement("td")
+  td.appendChild(document.createTextNode(fixLabel(arr[i])))
+  tr.appendChild(td)
+  }
+  tbody=document.createElement("tbody")
+  tbody.id='tbody'+idx
+  tbody.appendChild(tr)
+  a.list.appendChild(tbody)
+  idx++
+}
+function draw_batt(v){
+try{
+  var c2 = document.getElementById('batt')
+  ctx=c2.getContext("2d")
+  ctx.fillStyle="#000";
+  ctx.fillRect(0,0,c2.width,c2.height)
+  w=c2.width/(4.2-3.6)*(v-3.6)
+  w=Math.max(0,w)
+  ctx.fillStyle="#990";
+  if(w <= 5) ctx.fillStyle="#F00";
+  if(w > c2.width-5) ctx.fillStyle="#0F0";
+  ctx.fillRect(0,0,w,c2.height)
+  ctx.fillStyle=(w==0)?"#F00":"#FFF";
+  ctx.font="bold 16px sans-serif";
+  ctx.fillText(v+'V', (c2.width/2)-(String(v).length/2)*8, 14)
+}catch(err){}
+}
+function fixLabel(s)
+{
+  s=String(s).replace(/~/g, '\\u03A9')
+  return s.replace(/@/g, '\xB0')
+}
+
+function getFiles(varName)
+{
+ list=document.getElementById("list")
+ while(list.firstChild)
+   list.removeChild(list.firstChild)
+ idx=0
+ listArr=new Array()
+ ws.send('cmd;{"'+varName+'":0}')
+}
+</script>
+<body bgcolor="black" text="silver"  onload="{startWS()}">
+<div><h3 align="center">UT181A Files</h3>
+
+<table align=center width=440>
+<tr align=center><td><canvas id="batt" width="60" height="16"></td><td><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td></td></tr>
+<tr><td><input type="button" value="Saves" onClick="{getFiles('svs')}"></td>
+<td><input type="button" value="Records" onClick="{getFiles('rec')}"></td>
+<td><div id="status"></div></td></tr>
+</table>
+&nbsp
+<table style="font-size:small" id="list" width="550">
+</table>
+</div>
+</body>
+</html>
+)rawliteral";
 
 const uint8_t favicon[] PROGMEM = {
   0x1F, 0x8B, 0x08, 0x08, 0x70, 0xC9, 0xE2, 0x59, 0x04, 0x00, 0x66, 0x61, 0x76, 0x69, 0x63, 0x6F, 
