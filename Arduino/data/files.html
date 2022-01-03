@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>WiFi UT181A Web Page</title>
@@ -27,7 +27,7 @@ body{width:340px;font-family: Arial, Helvetica, sans-serif;}
 a=document.all
 function startWS(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.0.111/ws")
+//ws=new WebSocket("ws://192.168.0.117/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
@@ -45,6 +45,8 @@ ws.onmessage=function(evt){
 	dt=new Date(d.t*1000)
 	a.time.innerHTML=dt.toLocaleTimeString()+'.'+((d.t%1)*10).toFixed()
 	a.status.innerHTML=d.v+' '+fixLabel(d.u)
+	if(typeof(d.vlt)!='undefined')
+		draw_batt(d.vlt.toFixed(2))
  }
  else if(event == 'alert')
  {
@@ -155,7 +157,23 @@ function AddFile(type,arr)
   a.list.appendChild(tbody)
   idx++
 }
-
+function draw_batt(v){
+try{
+	var c2 = document.getElementById('batt')
+	ctx=c2.getContext("2d")
+	ctx.fillStyle="#000";
+	ctx.fillRect(0,0,c2.width,c2.height)
+	w=c2.width/(4.2-3.6)*(v-3.6)
+	w=Math.max(0,w)
+	ctx.fillStyle="#990";
+	if(w <= 5) ctx.fillStyle="#F00";
+	if(w > c2.width-5) ctx.fillStyle="#0F0";
+	ctx.fillRect(0,0,w,c2.height)
+	ctx.fillStyle=(w==0)?"#F00":"#FFF";
+	ctx.font="bold 16px sans-serif";
+	ctx.fillText(v+'V', (c2.width/2)-(String(v).length/2)*8, 14)
+}catch(err){}
+}
 function fixLabel(s)
 {
   s=String(s).replace(/~/g, '\\u03A9')
@@ -176,7 +194,7 @@ function getFiles(varName)
 <div><h3 align="center">UT181A Files</h3>
 
 <table align=center width=440>
-<tr align=center><td><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td></td><td></td></tr>
+<tr align=center><td><canvas id="batt" width="60" height="16"></td><td><div id="time" style="font-size:small"> 0:00:00 AM</div></td><td></td></tr>
 <tr><td><input type="button" value="Saves" onClick="{getFiles('svs')}"></td>
 <td><input type="button" value="Records" onClick="{getFiles('rec')}"></td>
 <td><div id="status"></div></td></tr>
