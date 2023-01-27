@@ -247,7 +247,7 @@ uint16_t UT181Interface::sum(uint8_t *p, uint16_t len)
 }
 
  // Write data from binary socket
- bool UT181Interface::WriteData(uint8_t *pData, int len)
+void UT181Interface::WriteData(uint8_t *pData, int len)
 {
   Write(pData, len);
 }
@@ -547,7 +547,7 @@ int UT181Interface::DisplayCnt()
   return 1;
 }
 
-char *UT181Interface::UnitText()
+const char *UT181Interface::UnitText()
 {
   if(m_MData.MinMax)
   {
@@ -562,7 +562,7 @@ char *UT181Interface::UnitText()
   return (m_MData.MinMax) ? m_MData.u.MM.szUnit : m_MData.u.Std.szUnit;
 }
 
-char *UT181Interface::ValueText(int which)
+const char *UT181Interface::ValueText(int which)
 {
   MValue Value;
 
@@ -590,7 +590,7 @@ char *UT181Interface::ValueText(int which)
   return ValueText(Value);
 }
 
-char *UT181Interface::ValueText(MValue &Value)
+const char *UT181Interface::ValueText(MValue &Value)
 {
   static char szVal[16];
 
