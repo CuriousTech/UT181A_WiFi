@@ -65,8 +65,6 @@ int serverPort = 80;
 SSD1306 display(0x3c, 5, 4); // Initialize the oled display for address 0x3c, sda=5, sdc=4
 
 WiFiManager wifi;  // AP page:  192.168.4.1
-//MDNSResponder mdns;
-//DNSServer dnsServer;
 AsyncWebServer server( serverPort );
 AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 AsyncWebSocket wsb("/bin"); // access at ws://[esp ip]/bin
@@ -75,7 +73,7 @@ uint32_t binClientID; // connected binary client
 void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue);
 JsonParse jsonParse(jsonCallback);
 UdpTime utime;
-eeMem eemem;
+eeMem ee;
 
 UT181Interface ut;
 uint32_t oldOpt;
@@ -129,7 +127,7 @@ String dataJson() // main meter data 10Hz
   {
     if(ut.m_MData.Comp) // comp mode
     {
-      char *p = "PASS";
+      const char *p = "PASS";
       if(ut.m_MData.Switch == 4 && ut.m_MData.Select >1) // temp
       {
         if(ut.m_MData.u.CompTemp.Fail) p = "FAIL";
@@ -193,7 +191,7 @@ void fixDeg(char *p) // deg kills websocket (try \xB0)
 
 String rangesJson() // get range and select options for dropdowns
 {
-  static char *rangeList[10][3][10] = {
+  const char *rangeList[10][3][10] = {
     {{"Auto", "6", "60", "600", "1000", NULL}, {"Auto", NULL}, {"Auto", NULL}},
     {{"Auto", "600", "60", NULL}, {"Auto", NULL}, {"Auto",NULL}},
     {{"Auto", "6", "60", "600", "1000", NULL}, {"Auto",NULL}, {"Auto",NULL}},
@@ -207,7 +205,7 @@ String rangesJson() // get range and select options for dropdowns
     {{"Auto",NULL}, {"Auto",NULL}, {"Auto",NULL} },
   };
 
-  static char *optList[10][3][10] = {
+  const char *optList[10][3][10] = {
     {{"VAC", "VAC,Hz", "Peak", "LowPass", "dBV", "dBM", NULL}, {NULL}, {NULL}},
     {{"mVAC", "mVAC,Hz", "Peak", "AC+DC", NULL}, {NULL}, {NULL}},
     {{"VDC", "AC+DC", "Peak", NULL}, {NULL}, {NULL} },
@@ -220,7 +218,7 @@ String rangesJson() // get range and select options for dropdowns
     {{"ADC", "AC+DC", "Peak", NULL}, {"AAC", "AAC,Hz", "Peak", NULL}, {NULL}},
   };
 
-  static char *selList[10][4] = {
+  const char *selList[10][4] = {
     {"VAC", NULL},
     {"mVAC", NULL},
     {"VDC", NULL },
@@ -248,7 +246,7 @@ String rangesJson() // get range and select options for dropdowns
   js.Array("r", rangeList[sw][sel] );
   js.Array("o", optList[sw][sel] );
 
-  char *szUnits[4];
+  const char *szUnits[4];
   szUnits[0] = NULL;
   szUnits[1] = NULL;
   szUnits[2] = NULL;
@@ -332,7 +330,7 @@ String rangesJson() // get range and select options for dropdowns
   }
   else if(ut.m_MData.Comp)
   {
-      static char *compM[] = {"INNER", "OUTER", "< VALUE", "> VALUE"};
+      const char *compM[] = {"INNER", "OUTER", "< VALUE", "> VALUE"};
       sLabels[0] = "";
 
       if(ut.m_MData.Switch == 4 && ut.m_MData.Select >1) // temp
@@ -860,7 +858,7 @@ void loop()
       {
         utime.start(); // update time daily at DST change
       }
-      eemem.update(); // update EEPROM if needed while we're at it (give user time to make many adjustments)
+      ee.update(); // update EEPROM if needed while we're at it (give user time to make many adjustments)
     }
 
     static uint8_t connTime = 1;
