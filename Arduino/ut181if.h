@@ -84,7 +84,7 @@ struct Record
 {
   char  szName[11];
   char  szUnit[8];
-  uint16_t  wInterval;
+  uint16_t wInterval;
   uint32_t dwDuration;
   uint32_t dwSamples;
   MValue mMax;
@@ -260,11 +260,11 @@ public:
   void start(bool bCont);
   bool Updated(void);
   bool Connected(void);
-  bool WriteData(uint8_t *pData, int len);
+  void WriteData(uint8_t *pData, int len);
   String convertDate(uniDate &dt);
-  char *ValueText(int which);
-  char *ValueText(MValue &mv);
-  char *UnitText(void);
+  const char *ValueText(int which);
+  const char *ValueText(MValue &mv);
+  const char *UnitText(void);
   int DisplayCnt(void);
   void SetRange(uint8_t n);
   void SetSelect(uint8_t nSel, uint8_t nOpt, bool bRel, float fValue);
