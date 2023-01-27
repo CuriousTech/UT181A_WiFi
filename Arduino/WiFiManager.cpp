@@ -36,7 +36,7 @@ void WiFiManager::autoConnect(char const *apName, const char *pPass)
   if ( ee.szSSID[0] ) {
     DEBUG_PRINT("Waiting for Wifi to connect");
 
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_AP_STA);
     WiFi.begin(ee.szSSID, ee.szSSIDPassword);
     WiFi.setHostname(apName);
     _state = ws_connecting;
@@ -52,7 +52,7 @@ void WiFiManager::autoConnect(char const *apName, const char *pPass)
 void WiFiManager::startAP()
 {
   //setup AP
-  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(_apName);
   DEBUG_PRINT("Started Soft Access Point");
 #ifdef OLED_ENABLE
@@ -96,7 +96,7 @@ bool WiFiManager::isCfg(void)
 void WiFiManager::setPass(const char *p)
 {
   strncpy(ee.szSSIDPassword, p, sizeof(ee.szSSIDPassword) );
-  eemem.update();
+  ee.update();
   DEBUG_PRINT("Updated EEPROM.  Restaring.");
   autoConnect(_apName, _pPass);
 }
