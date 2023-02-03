@@ -257,6 +257,7 @@ class UT181Interface
 public:
   UT181Interface(){};
   void service(time_t nw);
+  void WsPrint(String s);
   void start(bool bCont);
   bool Updated(void);
   bool Connected(void);
