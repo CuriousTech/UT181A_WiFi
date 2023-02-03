@@ -70,7 +70,7 @@ AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 AsyncWebSocket wsb("/bin"); // access at ws://[esp ip]/bin
 
 uint32_t binClientID; // connected binary client
-void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue);
+void jsonCallback(int16_t iName, int iValue, char *psValue);
 JsonParse jsonParse(jsonCallback);
 UdpTime utime;
 eeMem ee;
@@ -402,7 +402,7 @@ void parseParams(AsyncWebServerRequest *request) // parse URL params
   }
 }
 
-const char *jsonList1[] = { "cmd", // WebSocket commands
+const char *jsonList1[] = { // WebSocket commands
   "oled", // 0
   "TZ",
   "hold",
@@ -427,110 +427,107 @@ const char *jsonList1[] = { "cmd", // WebSocket commands
   NULL
 };
 
-void jsonCallback(int16_t iEvent, uint16_t iName, int iValue, char *psValue) // handle WebSocket commands
+void jsonCallback(int16_t iName, int iValue, char *psValue) // handle WebSocket commands
 {
   uint8_t sel;
   static char szName[16];
   static uint32_t wInterval;
 
-  switch(iEvent)
+  switch(iName)
   {
-    case 0: // cmd
-      switch(iName)
+    case 0: // OLED
+      ee.bEnableOLED = iValue ? true:false;
+      break;
+    case 1: // TZ
+      ee.tz = iValue;
+      break;
+    case 2: // hold
+      ut.Hold();
+      break;
+    case 3: // mm
+      ut.MinMax();
+      break;
+    case 4: // range
+      ut.SetRange(iValue);
+      break;
+    case 5: // select
+      ut.SetSelect(iValue, 0, false, 0);
+      break;
+    case 6: // opt
+      ut.SetSelect(ut.m_MData.Select, iValue, false, 0);
+      break;
+    case 7: // rel
+      sel = ut.m_MData.Select;
+      if(ut.m_MData.Rel)
+        ut.SetSelect(sel, 0, false, 0);
+      else
+        ut.SetSelect(sel, 0, true, ut.GetfValue());
+      break;
+    case 8: // records
+      ut.getRecordCount();
+      break;
+    case 9: // saves
+      ut.getSaveCount();
+      break;
+    case 10: // name
+      strncpy(szName, psValue, sizeof(szName)-1);
+      break;
+    case 11: // interval
+      if(strlen(psValue)==0)
+        iValue = 1;
+      wInterval = iValue;
+      break;
+    case 12: //save (duration)
+      if(iValue == 0)
+        ut.Save();
+      else
       {
-        case 0: // OLED
-          ee.bEnableOLED = iValue ? true:false;
-          break;
-        case 1: // TZ
-          ee.tz = iValue;
-          break;
-        case 2: // hold
-          ut.Hold();
-          break;
-        case 3: // mm
-          ut.MinMax();
-          break;
-        case 4: // range
-          ut.SetRange(iValue);
-          break;
-        case 5: // select
-          ut.SetSelect(iValue, 0, false, 0);
-          break;
-        case 6: // opt
-          ut.SetSelect(ut.m_MData.Select, iValue, false, 0);
-          break;
-        case 7: // rel
-          sel = ut.m_MData.Select;
-          if(ut.m_MData.Rel)
-            ut.SetSelect(sel, 0, false, 0);
-          else
-            ut.SetSelect(sel, 0, true, ut.GetfValue());
-          break;
-        case 8: // records
-          ut.getRecordCount();
-          break;
-        case 9: // saves
-          ut.getSaveCount();
-          break;
-        case 10: // name
-          strncpy(szName, psValue, sizeof(szName)-1);
-          break;
-        case 11: // interval
-          if(strlen(psValue)==0)
-            iValue = 1;
-          wInterval = iValue;
-          break;
-        case 12: //save (duration)
-          if(iValue == 0)
-            ut.Save();
-          else
-          {
-            if(strlen(szName) == 0) strcpy(szName, "Record_01");
-            if(wInterval == 0) wInterval = 1;
-            ut.StartRecord(szName, wInterval, iValue);
-            String s = "print;Start record ";
-            s += szName;
-            s += " ";
-            s += wInterval;
-            s += " ";
-            s += iValue;
-            WsSend(s);
-          }
-          break;
-        case 13: // stop
-          if(ut.m_MData.Recording)
-            ut.StopRecord();
-          break;
-        case 14: // file
-          ut.startRecordRetreval(iValue, szName, wInterval);
-          break;
-        case 15: // snap
-//        ut.getSave(iValue, true);
-          break;
-        case 16: // fmt
-          ee.exportFormat = iValue;
-          break;
-        case 17: // delf
-          ut.deleteRecord(iValue + 1);
-          break;
-        case 18: //dels
-          ut.deleteSave(iValue + 1);
-          break;
-        case 19: // rate
-          ee.rate = iValue;
-          skipCnt = 0;
-          break;
-        case 20: // sclk
-          ut.setClock();
-          break;
+        if(strlen(szName) == 0) strcpy(szName, "Record_01");
+        if(wInterval == 0) wInterval = 1;
+        ut.StartRecord(szName, wInterval, iValue);
+        jsonString js("print");
+        String s = "Start record ";
+        s += szName;
+        s += " ";
+        s += wInterval;
+        s += " ";
+        s += iValue;
+        js.Var("data", s);
+        WsSend(js.Close());
       }
+      break;
+    case 13: // stop
+      if(ut.m_MData.Recording)
+        ut.StopRecord();
+      break;
+    case 14: // file
+      ut.startRecordRetreval(iValue, szName, wInterval);
+      break;
+    case 15: // snap
+//        ut.getSave(iValue, true);
+      break;
+    case 16: // fmt
+      ee.exportFormat = iValue;
+      break;
+    case 17: // delf
+      ut.deleteRecord(iValue + 1);
+      break;
+    case 18: //dels
+      ut.deleteSave(iValue + 1);
+      break;
+    case 19: // rate
+      ee.rate = iValue;
+      skipCnt = 0;
+      break;
+    case 20: // sclk
+      ut.setClock();
       break;
   }
 }
 
 void sendSaveEntry(SaveRec *pRec)
 {
-  String s = "save;{\"a\":[[\"";
+  String s = "[[\"";
 
   s += ut.convertDate(pRec->Date);
   s += "\"],[\"";
@@ -585,14 +582,15 @@ void sendSaveEntry(SaveRec *pRec)
       s += "\"],[\""; s += pRec->u.a.szLabel2;
       s += "\"]]";
   }
-
-  s += ",\"b\":"; s+=pRec->type; s+="}";
-  ws.textAll(s);
+  jsonString js("save");
+  js.VarNoQ("data", s);
+  js.Var("b", pRec->type);
+  ws.textAll(js.Close());
 }
 
 void sendRecordEntry(Record *pRecord)
 {
-  String s = "record;{\"a\":[[\"";
+  String s = "[[\"";
   s += pRecord->szName;
   s += "\"],[\""; s += ut.convertDate(pRecord->Date);
   fixDeg(pRecord->szUnit);
@@ -603,8 +601,11 @@ void sendRecordEntry(Record *pRecord)
   s += "\"],[\""; s += ut.ValueText(pRecord->mMin);
   s += "\"],[\""; s += ut.ValueText(pRecord->mAvg);
   s += "\"],[\""; s += ut.ValueText(pRecord->mMax);
-  s += "\"]]}";
-  ws.textAll(s);
+  s += "\"]]";
+
+  jsonString js("record");
+  js.VarNoQ("data", s);
+  ws.textAll(js.Close());
 }
 
 void WsSend(String s) // send packat directly (preformatted)
@@ -636,13 +637,7 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
         //the whole message is in a single frame and we got all of it's data
         if(info->opcode == WS_TEXT){
           data[len] = 0;
-
-          char *pCmd = strtok((char *)data, ";"); // assume format is "name;{json:x}"
-          char *pData = strtok(NULL, "");
-
-          if(pCmd == NULL || pData == NULL) break;
-
-          jsonParse.process(pCmd, pData);
+          jsonParse.process((char*)data);
         }
       }
       break;
@@ -788,10 +783,11 @@ void setup()
   server.begin();
 
 #ifdef OTA_ENABLE
+  ArduinoOTA.setHostname(hostName);
   ArduinoOTA.begin();
 #endif
 
-  jsonParse.addList(jsonList1);
+  jsonParse.setList(jsonList1);
 
   utime.start();
 
