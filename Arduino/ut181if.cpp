@@ -1,6 +1,7 @@
 #include "ut181if.h"
 #include "eeMem.h"
 #include <TimeLib.h>
+#include "jsonstring.h"
 
 extern void sendBinData(uint8_t *p, int len);
 extern void sendSaveEntry(SaveRec *pRec);
@@ -23,9 +24,7 @@ void UT181Interface::service(time_t nw)
           m_state = 2;
         else
         {
-          s = "print;Expected AB got ";
-          s += String(c, HEX);
-          WsSend(s);
+          WsPrint("Expected AB got " + String(c, HEX));
         }
         break;
       case 1:
@@ -34,9 +33,7 @@ void UT181Interface::service(time_t nw)
         else
         {
           m_state = 0; // unexpected value
-          s = "print;Expected CD got ";
-          s += String(c, HEX);
-          WsSend(s);
+          WsPrint("Expected CD got " + String(c, HEX) );
         }
         break;
       case 2:
@@ -47,9 +44,7 @@ void UT181Interface::service(time_t nw)
         m_len |= (uint16_t)(c << 8);
         if(m_len > 3000)
         {
-          s = "print;Unexpected length ";
-          s += m_len;
-          WsSend(s);
+          WsPrint("Unexpected length " + m_len);
           m_len = 1;
         }
         m_state = 4;
@@ -60,10 +55,13 @@ void UT181Interface::service(time_t nw)
         if(m_idx == m_len || m_idx >= sizeof(m_buffer) )
         {
           if( sum(m_buffer, m_len-2) == (m_buffer[m_len-2] | (m_buffer[m_len-1]<<8)) )
+          {
+            delay(1);
             process_sentence(m_len-2);
+          }
           else
           {
-            WsSend("print;Checksum error");
+            WsPrint("Checksum error");
             digitalWrite(2, LOW); // strobe LED
             delay(5);
             digitalWrite(2, HIGH);
@@ -79,13 +77,21 @@ void UT181Interface::service(time_t nw)
   {
     m_keepAlive = nw;
     m_bConnected = false;
-    WsSend("print;Timeout");
+    WsPrint("Serial timeout");
     m_state = 0;
     m_idx = 0;
     m_len = 0;
     m_nRecReq = 0;
     m_nRecordItem = 0;
   }
+}
+
+void UT181Interface::WsPrint(String text)
+{
+  String s = "{\"cmd\":\"print\",\"text\":\"";
+  s += text;
+  s += "\"}";
+  WsSend(s);
 }
 
 bool UT181Interface::Updated() // check for new primary data packet update
@@ -106,6 +112,7 @@ bool UT181Interface::Connected()
 void UT181Interface::process_sentence(uint16_t len)
 {
   sendBinData(m_buffer, len);
+
   switch(m_buffer[0])
   {
     case RX_ACK:  // 1 = command respsonses
@@ -121,6 +128,7 @@ void UT181Interface::process_sentence(uint16_t len)
         m_bGetRecStart = false;
         getRecordData();
       }
+
       break;
     case RX_MDATA: // main meter data
       m_bConnected = true;
@@ -174,7 +182,7 @@ void UT181Interface::process_sentence(uint16_t len)
       {
         m_nRecordItem = 0;
         start(true);
-        WsSend("finish;0");
+        WsSend("{\"cmd\":\"finish\"");
       }
       break;
     case RX_REC_CNT:  // number of saves/records, model
@@ -200,6 +208,8 @@ void UT181Interface::process_sentence(uint16_t len)
           strcpy(m_szModel, (char *)m_buffer + 2);
           strcpy(m_szSerial, (char *)m_buffer + 13);
           break;
+        default:
+          break;
       }
       break;
   }
@@ -224,12 +234,13 @@ void UT181Interface::startRecordRetreval(int nItem, char *pszUnit, uint32_t dwSa
   m_nRecordItem = nItem + 1;
 }
 
-void UT181Interface::start(bool bCont) // start/stop meter data transmit, or single
+void UT181Interface::start(bool bCont) // start/stop meter data transmit, or single (responds with ACK)
 {
   static uint8_t cmd[]= {CMD_CONT_DATA, 0x00};
 
   if( m_nRecReq || m_nRecordItem) // in download mode
     return;
+
   if(!bCont)  m_bConnected = false;
 
   cmd[1] = bCont ? 1 : 0;
@@ -367,10 +378,9 @@ void UT181Interface::getRecordCount()
 
 void UT181Interface::decodeSamples(uint8_t *p, uint8_t count) // decode record file samples
 {
-  String s;
+  String s = "";
   s.reserve(4800);
 
-  s = "chunk;";
   for(int i = 0; i < count; i++)
   {
     RecItem item;
@@ -381,7 +391,9 @@ void UT181Interface::decodeSamples(uint8_t *p, uint8_t count) // decode record f
     s += "\r\n";
     p += sizeof(RecItem);
   }
-  WsSend(s);
+  jsonString js("chunk");
+  js.Var("data", s);
+  WsSend(js.Close());
 }
 
 void UT181Interface::getRecordData()
