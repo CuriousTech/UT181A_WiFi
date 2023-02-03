@@ -92,21 +92,17 @@ ws=new WebSocket("ws://"+window.location.host+"/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
-// console.log(evt.data)
- lines = evt.data.split(';')
- event=lines[0]
- data=lines[1]
- if(event == 'settings')
+ console.log(evt.data)
+ d=JSON.parse(evt.data)
+ if(d.cmd=='settings')
  {
- d=JSON.parse(data)
  oledon=d.o
  a.OLED.value=oledon?'ON ':'OFF'
  rate=d.r
  showRate()
  }
- else if(event == 'state')
+ else if(d.cmd=='state')
  {
-  d=JSON.parse(data)
   dt=new Date(d.t*1000)
   tk=+d.tk
   if(tk<10) tk=' '+tk+'&nbsp;'
@@ -155,19 +151,18 @@ ws.onmessage=function(evt){
     a.t1.innerHTML="PeakMin"
   }
  }
- else if(event == 'alert')
+ else if(d.cmd=='alert')
  {
-  alert(data)
+  alert(d.text)
  }
- else if(event == 'print')
+ else if(d.cmd=='print')
  {
-  a.status.innerHTML=data
-  console.log(data)
+  a.status.innerHTML=d.text
+  console.log(d.text)
  }
- else if(event == 'range')
+ else if(d.cmd=='range')
  {
   a.status.innerHTML=''
-  d=JSON.parse(data)
   for(i=0;i<3;i++){
    item=document.getElementById('s'+i)
    item.setAttribute('style',i<d.s.length?'':'display:none')
@@ -204,7 +199,7 @@ ws.onmessage=function(evt){
 
 function fixLabel(s)
 {
-  s=String(s).replace(/~/g, '\\u03A9')
+  s=String(s).replace(/~/g, '\u03A9')
   return s.replace(/@/g, '\xB0')
 }
 
@@ -221,7 +216,7 @@ return h+':'+m+':'+s
 }
 function setVar(varName, value)
 {
- ws.send('cmd;{"'+varName+'":'+value+'}')
+ ws.send('{"'+varName+'":'+value+'}')
 }
 function setA(n)
 {
@@ -551,49 +546,44 @@ ws=new WebSocket("ws://"+window.location.host+"/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 ws.onmessage=function(evt){
- lines = evt.data.split(';')
- event=lines[0]
- data=lines[1]
- 
- if(event == 'settings')
+ console.log(evt.data)
+ d=JSON.parse(evt.data)
+ if(d.cmd == 'settings')
  {
   getFiles('rec',0);
  }
- else if(event == 'state')
+ else if(d.cmd == 'state')
  {
-  d=JSON.parse(data)
   dt=new Date(d.t*1000)
   a.time.innerHTML=dt.toLocaleTimeString()+'.'+((d.t%1)*10).toFixed()
   a.status.innerHTML=d.v+' '+fixLabel(d.u)
   if(typeof(d.vlt)!='undefined')
     draw_batt(d.vlt.toFixed(2))
  }
- else if(event == 'alert')
+ else if(d.cmd == 'alert')
  {
-  alert(data)
+  alert(d.text)
  }
- else if(event == 'record')
+ else if(d.cmd == 'record')
  {
-  d=JSON.parse(data)
-  listArr.push(d.a)
-  AddFile(1,d.a)
+  listArr.push(d.data)
+  AddFile(1,d.data)
  }
- else if(event == 'save')
+ else if(d.cmd == 'save')
  {
-  d=JSON.parse(data)
-  listArr.push(d.a)
-  AddFile(0,d.a)
+  listArr.push(d.data)
+  AddFile(0,d.data)
  }
- else if(event == 'print')
+ else if(d.cmd == 'print')
  {
-  a.status.innerHTML=data
-  console.log(data)
- }else if(event == 'chunk')
+  a.status.innerHTML=d.text
+  console.log(d.text)
+ }else if(d.cmd == 'chunk')
  {
-  fileData.push(data)
+  fileData.push(d.data)
   a.status.innerHTML="Downloading "+fileData.length
  }
- else if(event == 'finish')
+ else if(d.cmd == 'finish')
  {
   a.status.innerHTML="Done";
   var file;
@@ -619,21 +609,21 @@ function dload(idx)
 {
   fileData=[]
   fileName=listArr[idx][0]+'.txt'
-  ws.send('cmd;{"name":"'+listArr[idx][2]+'","int":"'+listArr[idx][3]+'","file":'+idx+'}')
+  ws.send('{"name":"'+listArr[idx][2]+'","int":"'+listArr[idx][3]+'","file":'+idx+'}')
 }
 function getsnap(idx)
 {
-  ws.send('cmd;{"snap":'+idx+'}')
+  ws.send('{"snap":'+idx+'}')
 }
 function delfile(idx)
 {
-  ws.send('cmd;{"delf":'+idx+'}')
+  ws.send('{"delf":'+idx+'}')
   l=document.getElementById('tbody'+idx)
   a.list.removeChild(l)
 }
 function delsnap(idx)
 {
-  ws.send('cmd;{"dels":'+idx+'}')
+  ws.send('{"dels":'+idx+'}')
   l=document.getElementById('tbody'+idx)
   a.list.removeChild(l)
 }
@@ -696,7 +686,7 @@ try{
 }
 function fixLabel(s)
 {
-  s=String(s).replace(/~/g, '\\u03A9')
+  s=String(s).replace(/~/g, '\u03A9')
   return s.replace(/@/g, '\xB0')
 }
 
@@ -707,7 +697,7 @@ function getFiles(varName)
    list.removeChild(list.firstChild)
  idx=0
  listArr=new Array()
- ws.send('cmd;{"'+varName+'":0}')
+ ws.send('{"'+varName+'":0}')
 }
 </script>
 <body bgcolor="black" text="silver"  onload="{startWS()}">
