@@ -6,10 +6,12 @@ public:
   jsonString(const char *pLabel = NULL)
   {
     m_cnt = 0;
-    s = String("");
+    s = String("{");
     if(pLabel)
-      s = pLabel, s += ";";
-    s += "{";
+    {
+      s += "\"cmd\":\"";
+      s += pLabel, s += "\",";
+    }
   }
         
   String Close(void)
@@ -78,7 +80,7 @@ public:
     s += "\"";
     m_cnt++;
   }
-  
+
   void Var(const char *key, String sVal)
   {
     if(m_cnt) s += ",";
@@ -87,6 +89,16 @@ public:
     s += "\":\"";
     s += sVal;
     s += "\"";
+    m_cnt++;
+  }
+
+  void VarNoQ(const char *key, String sVal)
+  {
+    if(m_cnt) s += ",";
+    s += "\"";
+    s += key;
+    s += "\":";
+    s += sVal;
     m_cnt++;
   }
 
