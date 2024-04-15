@@ -369,15 +369,15 @@ try {
       {
         if(zoom>1)
         {
-          min=max=y
+          min2=max2=y
           for(j=i+1;j<i+zoom;j++)
           {
             y=base-(va[j][line]/ciel*range)
-            if(y<min) min=y
-            if(y>max) max=y
+            if(y<min2) min2=y
+            if(y>max2) max2=y
           }
-          if(min<y) ctx.lineTo(x,min)
-          if(max>y) ctx.lineTo(x,max)
+          if(min2<y) ctx.lineTo(x,min2)
+          if(max2>y) ctx.lineTo(x,max2)
         }
         ctx.lineTo(x,y)
       }
