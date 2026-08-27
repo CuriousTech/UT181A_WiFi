@@ -2925,7 +2925,7 @@ FQP27P06 -
 <part name="Q3" library="SparkFun-DiscreteSemi" deviceset="TRANSISTOR_NPN" device="SOT23-3"/>
 <part name="GND7" library="supply1" deviceset="GND" device=""/>
 <part name="R9" library="SparkFun-Resistors" deviceset="RESISTOR" device="0805-RES" value="47"/>
-<part name="RXD0" library="pinhead" library_urn="urn:adsk.eagle:library:325" deviceset="PINHD-1X10" device="" package3d_urn="urn:adsk.eagle:package:22406/2"/>
+<part name="TXD0" library="pinhead" library_urn="urn:adsk.eagle:library:325" deviceset="PINHD-1X10" device="" package3d_urn="urn:adsk.eagle:package:22406/2"/>
 <part name="BOTTOM" library="pinhead" library_urn="urn:adsk.eagle:library:325" deviceset="PINHD-1X10" device="" package3d_urn="urn:adsk.eagle:package:22406/2"/>
 <part name="B+" library="pinhead" library_urn="urn:adsk.eagle:library:325" deviceset="PINHD-1X1" device="" package3d_urn="urn:adsk.eagle:package:22485/2"/>
 </parts>
@@ -3010,7 +3010,7 @@ FQP27P06 -
 <attribute name="NAME" x="26.4414" y="120.65" size="1.778" layer="95" rot="R90"/>
 <attribute name="VALUE" x="31.242" y="120.65" size="1.778" layer="96" rot="R90"/>
 </instance>
-<instance part="RXD0" gate="A" x="106.68" y="33.02" smashed="yes">
+<instance part="TXD0" gate="A" x="106.68" y="33.02" smashed="yes">
 <attribute name="NAME" x="100.33" y="46.355" size="1.778" layer="95"/>
 <attribute name="VALUE" x="100.33" y="15.24" size="1.778" layer="96"/>
 </instance>
@@ -3118,17 +3118,6 @@ FQP27P06 -
 <wire x1="40.64" y1="116.84" x2="40.64" y2="111.76" width="0.1524" layer="91"/>
 </segment>
 </net>
-<net name="ADC" class="0">
-<segment>
-<label x="25.4" y="25.4" size="1.778" layer="95" rot="R180" xref="yes"/>
-<pinref part="R11" gate="G$1" pin="1"/>
-<wire x1="43.18" y1="25.4" x2="25.4" y2="25.4" width="0.1524" layer="91"/>
-<wire x1="43.18" y1="22.86" x2="43.18" y2="25.4" width="0.1524" layer="91"/>
-<junction x="43.18" y="25.4"/>
-<pinref part="R10" gate="G$1" pin="1"/>
-<wire x1="43.18" y1="25.4" x2="43.18" y2="27.94" width="0.1524" layer="91"/>
-</segment>
-</net>
 <net name="N$12" class="0">
 <segment>
 <pinref part="C5" gate="G$1" pin="2"/>
@@ -3191,7 +3180,7 @@ FQP27P06 -
 </net>
 <net name="TXD" class="0">
 <segment>
-<pinref part="RXD0" gate="A" pin="1"/>
+<pinref part="TXD0" gate="A" pin="1"/>
 <wire x1="104.14" y1="43.18" x2="91.44" y2="43.18" width="0.1524" layer="91"/>
 <label x="91.44" y="43.18" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
@@ -3221,15 +3210,10 @@ FQP27P06 -
 <wire x1="134.62" y1="22.86" x2="142.24" y2="22.86" width="0.1524" layer="91"/>
 <label x="142.24" y="22.86" size="1.778" layer="95" xref="yes"/>
 </segment>
-<segment>
-<pinref part="Q3" gate="G$1" pin="B"/>
-<wire x1="22.86" y1="99.06" x2="17.78" y2="99.06" width="0.1524" layer="91"/>
-<label x="17.78" y="99.06" size="1.778" layer="95" rot="R180" xref="yes"/>
-</segment>
 </net>
 <net name="IO5" class="0">
 <segment>
-<pinref part="RXD0" gate="A" pin="8"/>
+<pinref part="TXD0" gate="A" pin="8"/>
 <wire x1="104.14" y1="25.4" x2="93.98" y2="25.4" width="0.1524" layer="91"/>
 <label x="93.98" y="25.4" size="1.778" layer="95" rot="R180" xref="yes"/>
 </segment>
@@ -3238,6 +3222,41 @@ FQP27P06 -
 <wire x1="60.96" y1="109.22" x2="48.26" y2="109.22" width="0.1524" layer="91"/>
 <pinref part="Q1" gate="G$1" pin="C"/>
 <wire x1="48.26" y1="104.14" x2="48.26" y2="109.22" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="IO4" class="0">
+<segment>
+<pinref part="TXD0" gate="A" pin="7"/>
+<wire x1="104.14" y1="27.94" x2="96.52" y2="27.94" width="0.1524" layer="91"/>
+<label x="96.52" y="27.94" size="1.778" layer="95" rot="R180" xref="yes"/>
+</segment>
+<segment>
+<pinref part="Q3" gate="G$1" pin="B"/>
+<wire x1="22.86" y1="99.06" x2="17.78" y2="99.06" width="0.1524" layer="91"/>
+<label x="17.78" y="99.06" size="1.778" layer="95" rot="R180" xref="yes"/>
+</segment>
+</net>
+<net name="RXD0" class="0">
+<segment>
+<pinref part="TXD0" gate="A" pin="2"/>
+<wire x1="104.14" y1="40.64" x2="96.52" y2="40.64" width="0.1524" layer="91"/>
+<label x="96.52" y="40.64" size="1.778" layer="95" rot="R180" xref="yes"/>
+</segment>
+</net>
+<net name="IO2" class="0">
+<segment>
+<pinref part="TXD0" gate="A" pin="4"/>
+<wire x1="104.14" y1="35.56" x2="93.98" y2="35.56" width="0.1524" layer="91"/>
+<label x="93.98" y="35.56" size="1.778" layer="95" rot="R180" xref="yes"/>
+</segment>
+<segment>
+<label x="25.4" y="25.4" size="1.778" layer="95" rot="R180" xref="yes"/>
+<pinref part="R11" gate="G$1" pin="1"/>
+<wire x1="43.18" y1="25.4" x2="25.4" y2="25.4" width="0.1524" layer="91"/>
+<wire x1="43.18" y1="22.86" x2="43.18" y2="25.4" width="0.1524" layer="91"/>
+<junction x="43.18" y="25.4"/>
+<pinref part="R10" gate="G$1" pin="1"/>
+<wire x1="43.18" y1="25.4" x2="43.18" y2="27.94" width="0.1524" layer="91"/>
 </segment>
 </net>
 </nets>
